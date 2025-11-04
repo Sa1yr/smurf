@@ -2,15 +2,14 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: #121212;
     color: #e0e0e0;
-    display: grid;
-    place-items: center;
-    min-height: 100vh;
     margin: 0;
+    padding: 20px;
 }
 
 main {
-    width: 90%;
-    max-width: 600px;
+    width: 100%;
+    max-width: 1200px; /* Increased width for two columns */
+    margin: 0 auto;
     text-align: center;
 }
 
@@ -18,17 +17,9 @@ h1 {
     color: #00bfff; /* DeepSkyBlue */
 }
 
-.warning {
-    color: #ffc107; /* Amber */
-    font-size: 0.9rem;
-    background-color: #2b2a1d;
-    border: 1px solid #c89c0c;
-    border-radius: 4px;
-    padding: 8px;
-}
-
 .search-container {
     display: flex;
+    flex-wrap: wrap; /* Allows wrapping on small screens */
     justify-content: center;
     gap: 8px;
     margin-bottom: 24px;
@@ -55,7 +46,8 @@ select {
 }
 
 input#gameNameInput {
-    width: 200px;
+    flex-grow: 1;
+    min-width: 150px;
 }
 
 input#tagLineInput {
@@ -79,24 +71,57 @@ button:hover {
     background-color: #009acd;
 }
 
-#results {
+/* --- NEW GRID LAYOUT --- */
+#resultsGrid {
+    display: grid;
+    grid-template-columns: 1fr; /* One column on mobile */
+    gap: 20px;
+    text-align: left;
+}
+
+/* Two columns on larger screens */
+@media (min-width: 900px) {
+    #resultsGrid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.results-box {
     background-color: #1a1a1a;
     border: 1px solid #333;
     border-radius: 8px;
     padding: 20px;
-    text-align: left;
     min-height: 100px;
     line-height: 1.8;
 }
+/* --- END NEW GRID LAYOUT --- */
 
-/* --- New Styles --- */
 
-#results a {
-    color: #00bfff;
+/* --- NEW: op.gg icon link --- */
+.opgg-link {
+    font-size: 0.8rem;
+    color: #777;
     text-decoration: none;
+    margin-left: 8px;
     font-weight: bold;
+    border: 1px solid #444;
+    padding: 1px 4px;
+    border-radius: 3px;
+    white-space: nowrap;
 }
-#results a:hover {
+.opgg-link:hover {
+    background-color: #333;
+    color: #aaa;
+}
+
+/* --- NEW: Duo partner re-search link --- */
+.duo-link {
+    font-weight: bold;
+    color: #00bfff;
+    cursor: pointer;
+    text-decoration: none;
+}
+.duo-link:hover {
     text-decoration: underline;
 }
 
@@ -127,9 +152,58 @@ li {
     padding: 2px 0;
 }
 
-/* --- End New Styles --- */
-
 .loading {
     color: #888;
     font-style: italic;
+    text-align: center;
+    grid-column: 1 / -1; /* Span full width if in grid */
+}
+.error {
+    color: #F44336;
+    font-weight: bold;
+    text-align: center;
+    grid-column: 1 / -1; /* Span full width if in grid */
+}
+
+/* --- NEW: Mastery List Styles --- */
+#masterySearch {
+    width: 100%;
+    box-sizing: border-box; /* Fixes padding issues */
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
+
+#masteryList {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px; /* For scrollbar */
+}
+
+.mastery-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px;
+    border-radius: 3px;
+}
+
+.mastery-item span:first-child {
+    font-weight: bold;
+}
+
+/* Color coding */
+.mastery-0 {
+    background-color: #4a2d2d;
+    color: #f44336;
+}
+.mastery-1 {
+    background-color: #4a452d;
+    color: #ffc107;
+}
+.mastery-high {
+    background-color: #2f4a2d;
+    color: #4CAF50;
 }

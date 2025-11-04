@@ -1,114 +1,126 @@
-// This is your Vercel Serverless Function
 const fetch = require('node-fetch');
 
-// --- NEW: Region Mapping Function ---
-// Converts a platform region (e.g., "na1") to a continental region (e.g., "americas")
-// This is required by the Riot API (Account API vs. Match API)
+// Helper function to get the correct regional servers
 function getRegionalHost(platform) {
     switch (platform.toLowerCase()) {
-        case 'na1':
-        case 'br1':
-        case 'la1':
-        case 'la2':
+        case 'na1': case 'br1': case 'la1': case 'la2':
             return 'americas';
-        case 'euw1':
-        case 'eun1':
-        case 'tr1':
-        case 'ru':
+        case 'euw1': case 'eun1': case 'tr1': case 'ru':
             return 'europe';
-        case 'kr':
-        case 'jp1':
+        case 'kr': case 'jp1':
             return 'asia';
         case 'oc1':
             return 'sea';
         default:
-            return 'americas'; // Default to americas
+            return 'americas';
     }
 }
 
-export default async function handler(request, response) {
-    // 1. Get Game Name, Tag, AND Region from the query
-    const { name, tag, region } = request.query;
+// Helper to get Data Dragon champion names
+let championMap = null;
+async function getChampionMap() {
+    if (championMap) return championMap;
     
-    // 2. Get your SECRET API key from Vercel's "Environment Variables"
+    try {
+        const versionResponse = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+        const versions = await versionResponse.json();
+        const latestVersion = versions[0];
+        
+        const champResponse = await fetch(`https://ddragon.leagueoflegends.com/cdn/${latestVersion}/data/en_US/champion.json`);
+        const champData = await champResponse.json();
+        
+        const map = {};
+        for (const champName in champData.data) {
+            const champ = champData.data[champName];
+            map[champ.key] = champ.name; // Map ID (e.g., "266") to Name (e.g., "Aatrox")
+        }
+        championMap = map;
+        return championMap;
+    } catch (e) {
+        console.error("Failed to fetch champion map:", e);
+        return {}; // Return empty map on failure
+    }
+}
+
+
+export default async function handler(request, response) {
+    const { name, tag, region } = request.query;
     const apiKey = process.env.RIOT_API_KEY;
 
-    if (!apiKey) {
-        return response.status(500).json({ error: "API key is not configured." });
-    }
-    if (!name || !tag || !region) {
-        return response.status(400).json({ error: "Game Name, Tag, and Region are required." });
-    }
+    if (!apiKey) return response.status(500).json({ error: "API key is not configured." });
+    if (!name || !tag || !region) return response.status(400).json({ error: "Game Name, Tag, and Region are required." });
 
-    // --- NEW: Set up API hosts based on region ---
     const platformHost = region.toLowerCase();
     const regionalHost = getRegionalHost(platformHost);
 
     try {
-        // --- STEP 1: Get the Player's PUUID (Permanent ID) ---
-        // Uses the REGIONAL host
+        // --- STEP 1: Get PUUID ---
         const accountResponse = await fetch(`https://${regionalHost}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${name}/${tag}?api_key=${apiKey}`);
         if (!accountResponse.ok) throw new Error('Riot ID not found. Check Game Name, Tag, and Region.');
         const accountData = await accountResponse.json();
         const puuid = accountData.puuid;
 
-        // --- STEP 2: Get the Player's Account Level ---
-        // Uses the PLATFORM host
+        // --- STEP 2: Get Summoner Data (for Level and ID) ---
         const summonerResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${puuid}?api_key=${apiKey}`);
         if (!summonerResponse.ok) throw new Error('Summoner data not found on that platform.');
         const summonerData = await summonerResponse.json();
         const accountLevel = summonerData.summonerLevel;
+        const summonerId = summonerData.id; // <-- We need this for rank
 
-        // --- STEP 3: Get the Player's last 100 Match IDs ---
-        // Uses the REGIONAL host. Count is now 100.
-        const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=100&api_key=${apiKey}`);
+        // --- STEP 3: Get Highest Rank (NEW) ---
+        const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
+        let highestRank = "Unranked";
+        if (rankResponse.ok) {
+            const rankData = await rankResponse.json();
+            const soloDuo = rankData.find(q => q.queueType === "RANKED_SOLO_5x5");
+            if (soloDuo) {
+                highestRank = `${soloDuo.tier} ${soloDuo.rank} (${soloDuo.leaguePoints} LP)`;
+            }
+        }
+
+        // --- STEP 4: Get Champion Mastery (NEW) ---
+        const champMap = await getChampionMap(); // Get champion name mapping
+        const masteryResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}?api_key=${apiKey}`);
+        let mastery = [];
+        if (masteryResponse.ok) {
+            const masteryData = await masteryResponse.json();
+            mastery = masteryData.map(champ => ({
+                name: champMap[champ.championId] || `ID ${champ.championId}`,
+                level: champ.championLevel,
+                points: champ.championPoints
+            }));
+        }
+
+        // --- STEP 5: Get Match List (20 games) ---
+        const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20&api_key=${apiKey}`);
         if (!matchListResponse.ok) throw new Error('Could not fetch match list.');
         const matchIds = await matchListResponse.json();
 
-        // --- STEP 4: Analyze each match (This is the slow part!) ---
-        let totalKills = 0;
-        let totalDeaths = 0;
-        let totalAssists = 0;
-        let wins = 0;
-        let flashOnD = 0;
-        let flashOnF = 0;
-        const duoPartners = {}; 
-        const FLASH_SPELL_ID = 4; // This is the permanent ID for Summoner Flash
+        // --- STEP 6: Analyze Matches ---
+        let totalKills = 0, totalDeaths = 0, totalAssists = 0, wins = 0, flashOnD = 0, flashOnF = 0;
+        const duoPartners = {};
+        const FLASH_SPELL_ID = 4;
 
         for (const matchId of matchIds) {
-            // Uses the REGIONAL host
             const matchResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/${matchId}?api_key=${apiKey}`);
-            if (!matchResponse.ok) continue; // Skip this match if it fails
+            if (!matchResponse.ok) continue; 
             
             const matchData = await matchResponse.json();
-            
-            // Find our player in the match
             const playerInfo = matchData.info.participants.find(p => p.puuid === puuid);
             if (!playerInfo) continue;
 
-            // Add stats
             totalKills += playerInfo.kills;
             totalDeaths += playerInfo.deaths;
             totalAssists += playerInfo.assists;
-            if (playerInfo.win) {
-                wins++;
-            }
+            if (playerInfo.win) wins++;
 
-            // Check Flash position
-            if (playerInfo.summoner1Id === FLASH_SPELL_ID) {
-                flashOnD++;
-            }
-            if (playerInfo.summoner2Id === FLASH_SPELL_ID) {
-                flashOnF++;
-            }
+            if (playerInfo.summoner1Id === FLASH_SPELL_ID) flashOnD++;
+            if (playerInfo.summoner2Id === FLASH_SPELL_ID) flashOnF++;
 
-            // Find duo partner (check other 4 players on their team)
             matchData.info.participants.forEach(participant => {
                 if (participant.puuid !== puuid && participant.teamId === playerInfo.teamId) {
-                    
                     const gameName = participant.riotIdGameName;
-                    const tagLine = participant.riotIdTagline; // <-- Lowercase 'l' is correct
-
+                    const tagLine = participant.riotIdTagline;
                     if (gameName && gameName !== "undefined") {
                         const partnerName = `${gameName}#${tagLine}`;
                         duoPartners[partnerName] = (duoPartners[partnerName] || 0) + 1;
@@ -117,22 +129,19 @@ export default async function handler(request, response) {
             });
         }
 
-        // --- STEP 5: Calculate the final stats ---
+        // --- STEP 7: Calculate Final Stats ---
         const totalGames = matchIds.length;
         if (totalGames === 0) {
+            // Send back data for an account with 0 games
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
                 accountLevel,
-                totalGames: 0,
-                wins: 0,
-                losses: 0,
-                winRate: 0,
-                avgKills: 0,
-                avgDeaths: 0,
-                avgAssists: 0,
-                avgKDA: 0,
+                highestRank,
+                totalGames: 0, wins: 0, losses: 0, winRate: 0,
+                avgKills: 0, avgDeaths: 0, avgAssists: 0, avgKDA: 0,
                 flashKey: "N/A",
-                duoList: []
+                duoList: [],
+                mastery: mastery
             });
         }
         
@@ -143,45 +152,38 @@ export default async function handler(request, response) {
         const winRate = (wins / totalGames) * 100;
         const avgKDA = (totalKills + totalAssists) / (totalDeaths === 0 ? 1 : totalDeaths);
 
-        // --- NEW: Determine Flash string ---
         let flashKey = "None";
-        if (flashOnD > 0 && flashOnF > 0) {
-            flashKey = "D & F";
-        } else if (flashOnD > 0) {
-            flashKey = "D";
-        } else if (flashOnF > 0) {
-            flashKey = "F";
-        }
+        if (flashOnD > 0 && flashOnF > 0) flashKey = "D & F";
+        else if (flashOnD > 0) flashKey = "D";
+        else if (flashOnF > 0) flashKey = "F";
 
-        // --- NEW: Build Duo Partner List ---
         const duoList = [];
         for (const partner in duoPartners) {
-            if (duoPartners[partner] >= 2) { 
+            if (duoPartners[partner] >= 3) { // <-- CHANGED TO 3
                 duoList.push({ name: partner, games: duoPartners[partner] });
             }
         }
-        // Sort the list by most games played together
-        duoList.sort((a, b) => b.games - a.games);
+        duoList.sort((a, b) => b.games - a.games); // Sort by most games
 
-
-        // --- STEP 6: Send the good data back to the frontend! ---
+        // --- STEP 8: Send all data back to frontend ---
         response.status(200).json({
             searchedPlayer: { gameName: name, tagLine: tag },
             accountLevel,
+            highestRank,
             totalGames,
             wins,
             losses,
-            winRate: winRate,
+            winRate,
             avgKills,
             avgDeaths,
             avgAssists,
             avgKDA,
-            flashKey: flashKey,
-            duoList: duoList
+            flashKey,
+            duoList,
+            mastery
         });
 
     } catch (error) {
-        // Send a clean error message to the frontend
         response.status(500).json({ error: error.message });
     }
 }

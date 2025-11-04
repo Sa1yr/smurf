@@ -18,6 +18,15 @@ h1 {
     color: #00bfff; /* DeepSkyBlue */
 }
 
+.warning {
+    color: #ffc107; /* Amber */
+    font-size: 0.9rem;
+    background-color: #2b2a1d;
+    border: 1px solid #c89c0c;
+    border-radius: 4px;
+    padding: 8px;
+}
+
 .search-container {
     display: flex;
     justify-content: center;
@@ -31,6 +40,7 @@ h1 {
     padding-top: 5px;
 }
 
+select,
 input[type="text"] {
     background-color: #222;
     color: #fff;
@@ -38,6 +48,10 @@ input[type="text"] {
     border-radius: 4px;
     padding: 10px;
     font-size: 1rem;
+}
+
+select {
+    cursor: pointer;
 }
 
 input#gameNameInput {
@@ -75,16 +89,47 @@ button:hover {
     line-height: 1.8;
 }
 
-.loading {
-    color: #888;
-    font-style: italic;
+/* --- New Styles --- */
+
+#results a {
+    color: #00bfff;
+    text-decoration: none;
+    font-weight: bold;
+}
+#results a:hover {
+    text-decoration: underline;
 }
 
 .result-item {
     font-size: 1.1rem;
+    padding: 4px 0;
 }
 .result-item strong {
     color: #00bfff;
     min-width: 150px;
     display: inline-block;
+}
+
+.flash-consistent {
+    color: #4CAF50; /* Green */
+    font-weight: bold;
+}
+.flash-inconsistent {
+    color: #F44336; /* Red */
+    font-weight: bold;
+}
+
+ul {
+    padding-left: 20px;
+    margin: 10px 0 0 0;
+}
+li {
+    padding: 2px 0;
+}
+
+/* --- End New Styles --- */
+
+.loading {
+    color: #888;
+    font-style: italic;
 }

@@ -43,6 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="result-item"><strong>Win Rate:</strong> ${data.winRate.toFixed(1)}% (${data.wins}W - ${data.losses}L)</div>
                 <div class="result-item"><strong>Average KDA:</strong> ${data.avgKDA.toFixed(2)} (${data.avgKills.toFixed(1)} / ${data.avgDeaths.toFixed(1)} / ${data.avgAssists.toFixed(1)})</div>
                 <hr>
+                <div class="result-item"><strong>Flash on D:</strong> ${data.flashOnD} games</div>
+                <div class="result-item"><strong>Flash on F:</strong> ${data.flashOnF} games</div>
+                <hr>
                 <div class="result-item"><strong>Top Duo Partner:</strong> ${data.topDuoPartner}</div>
                 <div class="result-item"><strong>Games Together:</strong> ${data.topDuoGames}</div>
             `;

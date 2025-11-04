@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smurf Detector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main>
+        <h1>Smurf Detector (Prototype)</h1>
+        <p>Enter a Riot ID to analyze their recent performance.</p>
+        
+        <div class="search-container">
+            <input type="text" id="gameNameInput" placeholder="Game Name">
+            <span class="tag-divider">#</span>
+            <input type="text" id="tagLineInput" placeholder="TAG" maxlength="5">
+            <button id="searchButton">Analyze</button>
+        </div>
+
+        <div id="results">
+            </div>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -42,7 +42,10 @@ export default async function handler(request, response) {
         let totalDeaths = 0;
         let totalAssists = 0;
         let wins = 0;
+        let flashOnD = 0;
+        let flashOnF = 0;
         const duoPartners = {}; // A map to count games with others
+        const FLASH_SPELL_ID = 4; // This is the permanent ID for Summoner Flash
 
         for (const matchId of matchIds) {
             const matchResponse = await fetch(`https://americas.api.riotgames.com/lol/match/v5/matches/${matchId}?api_key=${apiKey}`);
@@ -62,21 +65,30 @@ export default async function handler(request, response) {
                 wins++;
             }
 
+            // --- NEW: Check Flash position ---
+            // summoner1Id is the 'D' key, summoner2Id is the 'F' key
+            if (playerInfo.summoner1Id === FLASH_SPELL_ID) {
+                flashOnD++;
+            }
+            if (playerInfo.summoner2Id === FLASH_SPELL_ID) {
+                flashOnF++;
+            }
+            // -------------------------------
+
             // Find duo partner (check other 4 players on their team)
             matchData.info.participants.forEach(participant => {
                 if (participant.puuid !== puuid && participant.teamId === playerInfo.teamId) {
                     
                     // --- THIS IS THE FIX ---
-                    // We now check if the gameName exists and is not 'undefined'
+                    // The field is 'riotIdTagline' (lowercase 'l')
                     const gameName = participant.riotIdGameName;
-                    const tagLine = participant.riotIdTagLine;
+                    const tagLine = participant.riotIdTagline; // <-- The 'l' is lowercase
+                    // ---------------------
 
                     if (gameName && gameName !== "undefined") {
                         const partnerName = `${gameName}#${tagLine}`;
                         duoPartners[partnerName] = (duoPartners[partnerName] || 0) + 1;
                     }
-                    // If the gameName is 'undefined', we simply don't count them.
-                    // ---------------------
                 }
             });
         }
@@ -115,7 +127,9 @@ export default async function handler(request, response) {
             avgAssists,
             avgKDA,
             topDuoPartner: topDuoPartner,
-            topDuoGames: topDuoGames
+            topDuoGames: topDuoGames,
+            flashOnD: flashOnD, // <-- NEW: Send Flash data
+            flashOnF: flashOnF  // <-- NEW: Send Flash data
         });
 
     } catch (error) {

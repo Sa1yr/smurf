@@ -9,11 +9,7 @@
 <body>
     <main>
         <h1>Smurf Detector (Prototype)</h1>
-        <p>Enter a Riot ID and select a region to analyze their last 100 games.</p>
-        <p class="warning">
-            Note: Searching 100 games is slow with a Dev Key. 
-            The search may take 30-60 seconds.
-        </p>
+        <p>Enter a Riot ID and select a region to analyze their stats.</p>
         
         <div class="search-container">
             <select id="regionSelect">
@@ -35,8 +31,13 @@
             <button id="searchButton">Analyze</button>
         </div>
 
-        <div id="results">
-            </div>
+        <div id="resultsGrid">
+            <div id="statsBox" class="results-box">
+                </div>
+            
+            <div id="masteryBox" class="results-box">
+                </div>
+        </div>
     </main>
     <script src="script.js"></script>
 </body>

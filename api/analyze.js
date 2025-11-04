@@ -67,14 +67,16 @@ export default async function handler(request, response) {
                 if (participant.puuid !== puuid && participant.teamId === playerInfo.teamId) {
                     
                     // --- THIS IS THE FIX ---
-                    // We now use the reliable Riot ID fields instead of the old 'summonerName'
-                    const partnerName = `${participant.riotIdGameName}#${participant.riotIdTagLine}`;
-                    // ---------------------
+                    // We now check if the gameName exists and is not 'undefined'
+                    const gameName = participant.riotIdGameName;
+                    const tagLine = participant.riotIdTagLine;
 
-                    // Check if the name is valid before counting
-                    if (partnerName && partnerName !== "undefined#undefined") {
+                    if (gameName && gameName !== "undefined") {
+                        const partnerName = `${gameName}#${tagLine}`;
                         duoPartners[partnerName] = (duoPartners[partnerName] || 0) + 1;
                     }
+                    // If the gameName is 'undefined', we simply don't count them.
+                    // ---------------------
                 }
             });
         }
@@ -82,9 +84,11 @@ export default async function handler(request, response) {
         // --- STEP 5: Calculate the final stats ---
         const totalGames = matchIds.length;
         const losses = totalGames - wins;
-        const avgKills = totalKills / totalGames;
-        const avgDeaths = totalDeaths / totalGames;
-        const avgAssists = totalAssists / totalGames;
+        // Check for totalGames > 0 to prevent dividing by zero if match list is empty
+        const avgKills = totalGames > 0 ? totalKills / totalGames : 0;
+        const avgDeaths = totalGames > 0 ? totalDeaths / totalGames : 0;
+        const avgAssists = totalGames > 0 ? totalAssists / totalGames : 0;
+        const winRate = totalGames > 0 ? (wins / totalGames) * 100 : 0;
         // KDA = (Kills + Assists) / Deaths. Handle 0 deaths.
         const avgKDA = (totalKills + totalAssists) / (totalDeaths === 0 ? 1 : totalDeaths);
 
@@ -92,7 +96,8 @@ export default async function handler(request, response) {
         let topDuoPartner = "None";
         let topDuoGames = 0;
         for (const partner in duoPartners) {
-            if (duoPartners[partner] > topDuoGames) {
+            // We'll set a minimum of 2 games to be considered a "duo"
+            if (duoPartners[partner] > topDuoGames && duoPartners[partner] >= 2) { 
                 topDuoPartner = partner;
                 topDuoGames = duoPartners[partner];
             }
@@ -104,7 +109,7 @@ export default async function handler(request, response) {
             totalGames,
             wins,
             losses,
-            winRate: (wins / totalGames) * 100,
+            winRate: winRate,
             avgKills,
             avgDeaths,
             avgAssists,

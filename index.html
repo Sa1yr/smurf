@@ -9,9 +9,26 @@
 <body>
     <main>
         <h1>Smurf Detector (Prototype)</h1>
-        <p>Enter a Riot ID to analyze their recent performance.</p>
+        <p>Enter a Riot ID and select a region to analyze their last 100 games.</p>
+        <p class="warning">
+            Note: Searching 100 games is slow with a Dev Key. 
+            The search may take 30-60 seconds.
+        </p>
         
         <div class="search-container">
+            <select id="regionSelect">
+                <option value="na1">NA</option>
+                <option value="euw1">EUW</option>
+                <option value="eun1">EUNE</option>
+                <option value="kr">KR</option>
+                <option value="br1">BR</option>
+                <option value="jp1">JP</option>
+                <option value="la1">LAN</option>
+                <option value="la2">LAS</option>
+                <option value="oc1">OCE</option>
+                <option value="tr1">TR</option>
+                <option value="ru">RU</option>
+            </select>
             <input type="text" id="gameNameInput" placeholder="Game Name">
             <span class="tag-divider">#</span>
             <input type="text" id="tagLineInput" placeholder="TAG" maxlength="5">

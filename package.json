@@ -1,0 +1,8 @@
+{
+  "name": "smurf-detector-prototype",
+  "version": "1.0.0",
+  "description": "Riot API prototype to get a production key.",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}

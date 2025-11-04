@@ -1,12 +1,4 @@
 // This is your Vercel Serverless Function
-
-// IMPORTANT: You must install 'node-fetch' for Vercel
-// Do this by opening a terminal in VS Code and running:
-// npm install node-fetch@2
-//
-// Then, create a 'package.json' file by running:
-// npm init -y
-
 // We use 'node-fetch' because 'fetch' isn't built into this version of Node.js
 const fetch = require('node-fetch');
 
@@ -15,7 +7,6 @@ export default async function handler(request, response) {
     const { name, tag } = request.query;
     
     // 2. Get your SECRET API key from Vercel's "Environment Variables"
-    // We will set this up in the Vercel dashboard later.
     const apiKey = process.env.RIOT_API_KEY;
 
     if (!apiKey) {
@@ -74,8 +65,16 @@ export default async function handler(request, response) {
             // Find duo partner (check other 4 players on their team)
             matchData.info.participants.forEach(participant => {
                 if (participant.puuid !== puuid && participant.teamId === playerInfo.teamId) {
-                    const partnerName = participant.summonerName;
-                    duoPartners[partnerName] = (duoPartners[partnerName] || 0) + 1;
+                    
+                    // --- THIS IS THE FIX ---
+                    // We now use the reliable Riot ID fields instead of the old 'summonerName'
+                    const partnerName = `${participant.riotIdGameName}#${participant.riotIdTagLine}`;
+                    // ---------------------
+
+                    // Check if the name is valid before counting
+                    if (partnerName && partnerName !== "undefined#undefined") {
+                        duoPartners[partnerName] = (duoPartners[partnerName] || 0) + 1;
+                    }
                 }
             });
         }

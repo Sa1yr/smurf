@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchButton = document.getElementById('searchButton');
     const statsBox = document.getElementById('statsBox');
     const masteryBox = document.getElementById('masteryBox');
-    const legendBox = document.getElementById('legendBox'); // <-- NEW
+    const legendBox = document.getElementById('legendBox');
 
     let currentMasteryData = []; // Store mastery data for sorting
     let masterySortState = 'level'; // 'level' or 'alpha'
@@ -22,9 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gameNameInput.addEventListener('keypress', (e) => e.key === 'Enter' && analyzePlayer());
     tagLineInput.addEventListener('keypress', (e) => e.key === 'Enter' && analyzePlayer());
 
-
     // --- Helper Functions ---
-
     function getOpGgRegion(platformId) {
         const regionMap = {
             'na1': 'na', 'euw1': 'euw', 'eun1': 'eune', 'kr': 'kr', 'br1': 'br',
@@ -35,9 +33,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildOpGgLink(gameName, tagLine, region) {
         const opGgRegion = getOpGgRegion(region);
-        // Correct format: {name}-{tag}
-        const formattedName = `${gameName}-${tagLine}`;
+        const formattedName = `${gameName}-${tagLine}`; // Correct op.gg format
         return `https://op.gg/summoners/${opGgRegion}/${encodeURIComponent(formattedName)}`;
+    }
+    
+    // Helper to create a stat's visual block
+    function createStatDisplay(value, highlight) {
+        const asterisk = highlight === 'red' ? ' *' : '';
+        return `<span class="stat-${highlight}">${value}${asterisk}</span>`;
     }
 
     // --- Main Search Function ---
@@ -61,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         statsBox.innerHTML = '<p class="loading">Analyzing recent matches...</p>';
         masteryBox.innerHTML = '<p class="loading">Fetching champion mastery...</p>';
-        legendBox.style.display = 'none'; // Hide legend during load
+        legendBox.style.display = 'none';
 
         try {
             const response = await fetch(`/api/analyze?name=${gameName}&tag=${tagLine}&region=${region}`);
@@ -73,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderStatsBox(data, region);
             renderMasteryBox(data.mastery);
-            renderLegendBox(data); // <-- NEW
+            renderLegendBox(data.highlights); // Pass highlights to legend
 
         } catch (error) {
             statsBox.innerHTML = `<p class="error"><strong>Error:</strong> ${error.message}</p>`;
@@ -87,16 +90,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderStatsBox(data, region) {
         const playerLink = buildOpGgLink(data.searchedPlayer.gameName, data.searchedPlayer.tagLine, region);
         
-        let flashClass = "";
-        let flashAsterisk = "";
-        if (data.flashKey === "D & F") {
-            flashClass = "flash-inconsistent"; // Red
-            flashAsterisk = " *"; // Add asterisk
-        } else if (data.flashKey === "D" || data.flashKey === "F") {
-            flashClass = "flash-consistent"; // Green
-        }
-        const flashDisplay = `<span class="${flashClass}">${data.flashKey}${flashAsterisk}</span>`;
+        // --- Create all stat display elements ---
+        const totalRankDisplay = createStatDisplay(data.totalRank.display, data.highlights.totalWinRate);
+        const profileIconDisplay = createStatDisplay(data.profileIcon.isDefault ? "Yes" : "No", data.highlights.profileIcon);
+        const flashDisplay = createStatDisplay(data.flashKey, data.highlights.flash);
+        const multiKillDisplay = createStatDisplay(data.multiKills, data.highlights.multiKills);
+        
+        // Stats from 20 recent ranked games
+        const recentWinRateDisplay = createStatDisplay(`${data.recentWinRate.toFixed(1)}% (${data.wins}W - ${data.losses}L)`, 'neutral');
+        const avgKdaDisplay = createStatDisplay(data.avgKDA.toFixed(2), 'neutral');
+        const avgDpmDisplay = createStatDisplay(data.avgDPM.toFixed(0), data.highlights.dpm);
+        const avgCspmDisplay = createStatDisplay(data.avgCSPM.toFixed(1), data.highlights.cspm);
+        const avgKpDisplay = createStatDisplay(data.avgKP.toFixed(1) + '%', data.highlights.kp);
 
+        // Build the Duo Partner list
         let duoHtml = '<strong>Duo Partners (>= 3 games):</strong>';
         if (data.duoList.length === 0) {
             duoHtml += "<p style='margin:0; padding-left:10px;'>None found.</p>";
@@ -118,25 +125,34 @@ document.addEventListener('DOMContentLoaded', () => {
             duoHtml += '</ul>';
         }
 
+        // Display final stats
         statsBox.innerHTML = `
             <div class="result-item">
                 <strong>Player:</strong>
-                <span>${data.searchedPlayer.gameName}#${data.searchedPlayer.tagLine}</span>
-                <a href="${playerLink}" target="_blank" class="opgg-link">[op.gg]</a>
+                <span class="result-value">
+                    <span>${data.searchedPlayer.gameName}#${data.searchedPlayer.tagLine}</span>
+                    <a href="${playerLink}" target="_blank" class="opgg-link">[op.gg]</a>
+                </span>
             </div>
-            <div class="result-item"><strong>Account Level:</strong> ${data.accountLevel}</div>
-            <div class="result-item"><strong>Current Rank:</strong> ${data.currentRank}</div>
+            <div class="result-item"><strong>Account Level:</strong> <span class="result-value">${data.accountLevel}</span></div>
+            <div class="result-item"><strong>Default Icon:</strong> <span class="result-value">${profileIconDisplay}</span></div>
             <hr>
-            <div class="result-item"><strong>Analyzed:</strong> ${data.totalGames} matches</div>
-            <div class="result-item"><strong>Win Rate:</strong> ${data.winRate.toFixed(1)}% (${data.wins}W - ${data.losses}L)</div>
-            <div class="result-item"><strong>Average KDA:</strong> ${data.avgKDA.toFixed(2)} (${data.avgKills.toFixed(1)} / ${data.avgDeaths.toFixed(1)} / ${data.avgAssists.toFixed(1)})</div>
-            <div class="result-item"><strong>Flash on:</strong> ${flashDisplay}</div>
+            <div class="result-item"><strong>Current Rank:</strong> <span class="result-value">${data.currentRank}</span></div>
+            <div class="result-item"><strong>Total Ranked:</strong> <span class="result-value">${totalRankDisplay}</span></div>
+            <hr>
+            <div class="result-item"><strong>Recent 20 (Ranked):</strong> <span class="result-value">${recentWinRateDisplay}</span></div>
+            <div class="result-item"><strong>Recent KDA:</strong> <span class="result-value">${avgKdaDisplay}</span></div>
+            <div class="result-item"><strong>Recent DPM:</strong> <span class="result-value">${avgDpmDisplay}</span></div>
+            <div class="result-item"><strong>Recent CSPM:</strong> <span class="result-value">${avgCspmDisplay}</span></div>
+            <div class="result-item"><strong>Recent KP:</strong> <span class="result-value">${avgKpDisplay}</span></div>
+            <div class="result-item"><strong>Multi-kills:</strong> <span class="result-value">${multiKillDisplay}</span></div>
+            <div class="result-item"><strong>Flash on:</strong> <span class="result-value">${flashDisplay}</span></div>
             <hr>
             <div class="result-item">${duoHtml}</div>
         `;
     }
 
-    // --- NEW: Function to render the mastery box ---
+    // --- UPDATED: Function to render the mastery box ---
     function renderMasteryBox(masteryData) {
         if (!masteryData) {
             masteryBox.innerHTML = '<h3>Champion Mastery</h3><p>No mastery data found.</p>';
@@ -147,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         masterySortState = 'level'; // Default sort
 
         masteryBox.innerHTML = `
-            <h3>Champion Mastery</h3>
+            <h3>Champion Mastery (All)</h3>
             <div class="mastery-controls">
                 <input type="text" id="masterySearch" placeholder="Search champions...">
                 <button id="masterySortButton">Sort A-Z</button>
@@ -157,12 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         drawMasteryList(); // Initial draw
 
-        // Add event listener for the new search bar
         document.getElementById('masterySearch').addEventListener('keyup', (e) => {
             drawMasteryList(e.target.value.toLowerCase());
         });
 
-        // Add event listener for the sort button
         document.getElementById('masterySortButton').addEventListener('click', () => {
             const button = document.getElementById('masterySortButton');
             if (masterySortState === 'level') {
@@ -178,7 +192,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- NEW: Helper to draw/redraw the mastery list ---
     function drawMasteryList(searchTerm = '') {
         const listElement = document.getElementById('masteryList');
         let masteryHtml = '';
@@ -207,20 +220,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- NEW: Function to render the legend box ---
-    function renderLegendBox(data) {
-        let legendHtml = '<h3>Legend</h3>';
+    function renderLegendBox(highlights) {
+        let legendHtml = '<h3>* Potential Smurf Indicators</h3>';
         let items = 0;
 
-        if (data.flashKey === "D & F") {
+        if (highlights.totalWinRate === 'red' || highlights.dpm === 'red' || highlights.cspm === 'red' || highlights.kp === 'red' || highlights.multiKills === 'red' || highlights.profileIcon === 'red') {
             legendHtml += `
                 <div class="legend-item">
-                    <div class="legend-color-box flash-inconsistent" style="background-color: #4a2d2d;"></div>
-                    <span><b>Inconsistent Flash:</b> Player uses D and F for Flash. Potential smurf / shared account indicator.</span>
+                    <div class="legend-color-box stat-red" style="background-color: #4a2d2d;"></div>
+                    <span><b>High Stats for Rank:</b> Player's stats (Win Rate, DPM, CSPM, KP) are unusually high for their current rank.</span>
                 </div>
             `;
             items++;
         }
-
+        if (highlights.flash === 'red') {
+            legendHtml += `
+                <div class="legend-item">
+                    <div class="legend-color-box stat-red" style="background-color: #4a2d2d;"></div>
+                    <span><b>Inconsistent Flash:</b> Player uses both D and F for Flash. This can indicate an account is shared or being played by someone else.</span>
+                </div>
+            `;
+            items++;
+        }
+        
         // Always show the mastery 0 legend
         legendHtml += `
             <div class="legend-item">

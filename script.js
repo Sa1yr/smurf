@@ -87,21 +87,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- UPDATED: Function to render the stats box ---
+    // --- Function to render the stats box ---
     function renderStatsBox(data, region) {
         const playerLink = buildOpGgLink(data.searchedPlayer.gameName, data.searchedPlayer.tagLine, region);
         
         // --- Create all stat display elements ---
-        
-        // This correctly displays the "Unranked" or "GOLD IV (20 LP)" string from the API
-        const currentRankDisplay = createStatDisplay(data.currentRank, 'neutral');
-
+        const currentRankDisplay = createStatDisplay(data.currentRank, 'neutral'); // This will now show "GOLD IV (Flex)" etc.
         const totalRankDisplay = createStatDisplay(data.totalRank.display, data.highlights.totalWinRate);
         const profileIconDisplay = createStatDisplay(data.profileIcon.isDefault ? "Yes" : "No", data.highlights.profileIcon);
         const flashDisplay = createStatDisplay(data.flashKey, data.highlights.flash);
         const multiKillDisplay = createStatDisplay(data.multiKills, data.highlights.multiKills);
         
-        // Stats from 20 recent ranked games
         const recentWinRateDisplay = createStatDisplay(`${data.recentWinRate.toFixed(1)}% (${data.wins}W - ${data.losses}L)`, 'neutral');
         const avgKdaDisplay = createStatDisplay(data.avgKDA.toFixed(2), 'neutral');
         const avgDpmDisplay = createStatDisplay(data.avgDPM.toFixed(0), data.highlights.dpm);
@@ -142,10 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="result-item"><strong>Account Level:</strong> <span class="result-value">${data.accountLevel}</span></div>
             <div class="result-item"><strong>Default Icon:</strong> <span class="result-value">${profileIconDisplay}</span></div>
             <hr>
-            <div class="result-item"><strong>Current Rank:</strong> <span class="result-value">${currentRankDisplay}</span></div>
+            <div class="result-item"><strong>Highest Rank:</strong> <span class="result-value">${currentRankDisplay}</span></div>
             <div class="result-item"><strong>Total Ranked:</strong> <span class="result-value">${totalRankDisplay}</span></div>
             <hr>
-            <div class="result-item"><strong>Recent 20 (Ranked):</strong> <span class="result-value">${recentWinRateDisplay}</span></div>
+            <div class="result-item"><strong>Recent 20 (All):</strong> <span class="result-value">${recentWinRateDisplay}</span></div>
             <div class="result-item"><strong>Recent KDA:</strong> <span class="result-value">${avgKdaDisplay}</span></div>
             <div class="result-item"><strong>Recent DPM:</strong> <span class="result-value">${avgDpmDisplay}</span></div>
             <div class="result-item"><strong>Recent CSPM:</strong> <span class="result-value">${avgCspmDisplay}</span></div>
@@ -237,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
         listElement.innerHTML = masteryHtml;
     }
 
-    // --- NEW: Function to render the legend box ---
+    // --- Function to render the legend box ---
     function renderLegendBox(highlights) {
         let legendHtml = '<h3>* Potential Smurf Indicators</h3>';
         let items = 0;

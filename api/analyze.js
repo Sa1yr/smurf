@@ -48,6 +48,7 @@ function getRankNumber(tier) {
         "IRON": 0, "BRONZE": 1, "SILVER": 2, "GOLD": 3, "PLATINUM": 4, 
         "EMERALD": 5, "DIAMOND": 6, "MASTER": 7, "GRANDMASTER": 8, "CHALLENGER": 9
     };
+    // tier can be undefined if unranked, default to 0
     return ranks[tier] || 0;
 }
 
@@ -138,29 +139,46 @@ export default async function handler(request, response) {
         const summonerId = summonerData.id;
         const profileIconId = summonerData.profileIconId; // <-- NEW
 
-        // --- STEP 3: Get Rank & Total Season Stats (UPDATED) ---
+        // --- STEP 3: Get Rank & Total Season Stats (*** CRITICAL FIX ***) ---
         const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
+        
         let currentRank = "Unranked";
-        let rankTier = "UNRANKED"; // For threshold logic
+        let rankTier = "UNRANKED";
         let totalRankStats = { display: "0W - 0L (0%)", wins: 0, losses: 0, winRate: 0, totalGames: 0 };
         
         if (rankResponse.ok) {
             const rankData = await rankResponse.json();
             const soloDuo = rankData.find(q => q.queueType === "RANKED_SOLO_5x5");
+            const flex = rankData.find(q => q.queueType === "RANKED_FLEX_SR");
+
+            let bestRank = null;
+            let rankLabel = "";
+
+            // We prioritize Solo/Duo rank, then Flex rank
             if (soloDuo) {
-                currentRank = `${soloDuo.tier} ${soloDuo.rank} (${soloDuo.leaguePoints} LP)`;
-                rankTier = soloDuo.tier;
-                const totalGames = soloDuo.wins + soloDuo.losses;
-                const winRate = totalGames > 0 ? (soloDuo.wins / totalGames) * 100 : 0;
+                bestRank = soloDuo;
+                rankLabel = "(Solo/Duo)";
+            } else if (flex) {
+                bestRank = flex;
+                rankLabel = "(Flex)";
+            }
+
+            if (bestRank) {
+                currentRank = `${bestRank.tier} ${bestRank.rank} (${bestRank.leaguePoints} LP) ${rankLabel}`;
+                rankTier = bestRank.tier;
+                const totalGames = bestRank.wins + bestRank.losses;
+                const winRate = totalGames > 0 ? (bestRank.wins / totalGames) * 100 : 0;
                 totalRankStats = {
-                    display: `${soloDuo.wins}W - ${soloDuo.losses}L (${winRate.toFixed(1)}%)`,
-                    wins: soloDuo.wins,
-                    losses: soloDuo.losses,
+                    display: `${bestRank.wins}W - ${bestRank.losses}L (${winRate.toFixed(1)}%)`,
+                    wins: bestRank.wins,
+                    losses: bestRank.losses,
                     winRate: winRate,
                     totalGames: totalGames
                 };
             }
         }
+        // --- END OF RANK FIX ---
+
 
         // --- STEP 4: Get Champion Mastery (Full List) ---
         const allChampsMap = await getChampionMap();
@@ -187,15 +205,15 @@ export default async function handler(request, response) {
         }
         fullMasteryList.sort((a, b) => b.points - a.points); // Sort by points by default
 
-        // --- STEP 5: Get Match List (20 Ranked Solo games) ---
-        // NEW: Added queue=420 to filter for Ranked Solo/Duo
-        const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&start=0&count=20&api_key=${apiKey}`);
+        // --- STEP 5: Get Match List (20 games) ---
+        // *** CRITICAL FIX ***: Removed queue=420 filter to get ALL recent games
+        const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20&api_key=${apiKey}`);
         if (!matchListResponse.ok) throw new Error('Could not fetch match list.');
         const matchIds = await matchListResponse.json();
 
         // --- STEP 6: Analyze Matches ---
         let totalKills = 0, totalDeaths = 0, totalAssists = 0, wins = 0, flashOnD = 0, flashOnF = 0;
-        let totalDPM = 0, totalCSPM = 0, totalKP = 0, totalMultiKills = 0;
+        let totalDPM = 0, totalCSPM = 0, totalKP = 0, totalMultiKills = 0, totalGameTime = 0;
         const duoPartners = {};
         const FLASH_SPELL_ID = 4;
 
@@ -204,31 +222,30 @@ export default async function handler(request, response) {
             if (!matchResponse.ok) continue; 
             
             const matchData = await matchResponse.json();
+            // Need to filter out bot games, custom games, etc. which can skew stats
+            if (matchData.info.gameDuration < 300) continue; // Skip games less than 5 min
+            
             const gameDurationMinutes = matchData.info.gameDuration / 60;
             const playerInfo = matchData.info.participants.find(p => p.puuid === puuid);
             if (!playerInfo) continue;
 
-            // Find player's team and total kills
             const team = matchData.info.teams.find(t => t.teamId === playerInfo.teamId);
-            const teamTotalKills = team ? team.objectives.champion.kills : playerInfo.kills;
+            // Use 1 as a fallback for total kills to avoid divide-by-zero, though it should be >= kills
+            const teamTotalKills = team ? (team.objectives.champion.kills > 0 ? team.objectives.champion.kills : 1) : 1;
 
-            // Standard stats
             totalKills += playerInfo.kills;
             totalDeaths += playerInfo.deaths;
             totalAssists += playerInfo.assists;
             if (playerInfo.win) wins++;
 
-            // Flash
             if (playerInfo.summoner1Id === FLASH_SPELL_ID) flashOnD++;
             if (playerInfo.summoner2Id === FLASH_SPELL_ID) flashOnF++;
 
-            // New stats
             totalDPM += playerInfo.totalDamageDealtToChampions / gameDurationMinutes;
             totalCSPM += playerInfo.totalMinionsKilled / gameDurationMinutes;
-            totalKP += (teamTotalKills > 0) ? ((playerInfo.kills + playerInfo.assists) / teamTotalKills) * 100 : 0;
+            totalKP += ((playerInfo.kills + playerInfo.assists) / teamTotalKills) * 100;
             totalMultiKills += (playerInfo.pentaKills + playerInfo.quadraKills);
 
-            // Duo partner logic
             matchData.info.participants.forEach(participant => {
                 if (participant.puuid !== puuid && participant.teamId === playerInfo.teamId) {
                     const gameName = participant.riotIdGameName;
@@ -244,7 +261,7 @@ export default async function handler(request, response) {
         // --- STEP 7: Calculate Final Stats ---
         const totalGames = matchIds.length;
         if (totalGames === 0) {
-            // Handle account with 0 recent ranked games
+            // Handle account with 0 recent games
             const highlights = getStatHighlights({ rankTier, ...totalRankStats, profileIcon: profileIconId });
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
@@ -281,7 +298,6 @@ export default async function handler(request, response) {
         }
         duoList.sort((a, b) => b.games - a.games);
         
-        // --- NEW: Run all stats through the highlight function ---
         const highlights = getStatHighlights({
             rankTier,
             ...totalRankStats,
@@ -298,7 +314,7 @@ export default async function handler(request, response) {
             searchedPlayer: { gameName: name, tagLine: tag },
             accountLevel,
             profileIcon: { isDefault: profileIconId <= 28 },
-            currentRank,
+            currentRank, // This now includes (Solo/Duo) or (Flex)
             totalRank: totalRankStats,
             totalGames,
             wins,
@@ -319,6 +335,6 @@ export default async function handler(request, response) {
         });
 
     } catch (error) {
-        response.status(500).json({ error: error.message });
+        response.status(5T00).json({ error: error.message });
     }
 }

@@ -41,6 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helper to create a stat's visual block
     function createStatDisplay(value, highlight) {
         const asterisk = highlight === 'red' ? ' *' : '';
+        // If the value includes "Error", always highlight red
+        if (typeof value === 'string' && value.includes('Error')) {
+            highlight = 'red';
+        }
         return `<span class="stat-${highlight}">${value}${asterisk}</span>`;
     }
 
@@ -77,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderStatsBox(data, region);
             renderMasteryBox(data.mastery);
-            renderLegendBox(data.highlights); // Pass highlights to legend
+            renderLegendBox(data.highlights, data); // Pass highlights and data
 
         } catch (error) {
             statsBox.innerHTML = `<p class="error"><strong>Error:</strong> ${error.message}</p>`;
@@ -92,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const playerLink = buildOpGgLink(data.searchedPlayer.gameName, data.searchedPlayer.tagLine, region);
         
         // --- Create all stat display elements ---
-        const currentRankDisplay = createStatDisplay(data.currentRank, 'neutral'); // This will now show "GOLD IV (Flex)" etc.
+        const currentRankDisplay = createStatDisplay(data.currentRank, 'neutral');
         const totalRankDisplay = createStatDisplay(data.totalRank.display, data.highlights.totalWinRate);
         const profileIconDisplay = createStatDisplay(data.profileIcon.isDefault ? "Yes" : "No", data.highlights.profileIcon);
         const flashDisplay = createStatDisplay(data.flashKey, data.highlights.flash);
@@ -233,10 +237,21 @@ document.addEventListener('DOMContentLoaded', () => {
         listElement.innerHTML = masteryHtml;
     }
 
-    // --- Function to render the legend box ---
-    function renderLegendBox(highlights) {
+    // --- UPDATED: Function to render the legend box ---
+    function renderLegendBox(highlights, data) {
         let legendHtml = '<h3>* Potential Smurf Indicators</h3>';
         let items = 0;
+
+        // Check for API errors first
+        if (data.currentRank.includes('Error')) {
+             legendHtml += `
+                <div class="legend-item">
+                    <div class="legend-color-box stat-red" style="background-color: #4a2d2d;"></div>
+                    <span><b>Rank API Error:</b> The API returned an error (${data.currentRank}). This is often a <b>403 Forbidden</b> (bad/expired API key) or <b>429 Rate Limit</b> (too many requests).</span>
+                </div>
+            `;
+            items++;
+        }
 
         // Check all highlights. If any are 'red', we add the legend.
         const hasRedStat = Object.values(highlights).some(value => value === 'red');

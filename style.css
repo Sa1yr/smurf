@@ -159,15 +159,34 @@ li {
     grid-column: 1 / -1;
 }
 
+/* --- NEW: Mastery List Styles --- */
+.mastery-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
 #masterySearch {
-    width: 100%;
+    flex-grow: 1; /* Takes up remaining space */
     box-sizing: border-box; 
     padding: 8px;
-    margin-bottom: 10px;
     background-color: #333;
     color: #fff;
     border: 1px solid #555;
     border-radius: 4px;
+}
+
+#masterySortButton {
+    background-color: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0 10px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+#masterySortButton:hover {
+    background-color: #444;
 }
 
 #masteryList {
@@ -197,10 +216,32 @@ li {
 }
 .mastery-high {
     background-color: #2f4a2d;
-    color: #4CAF5T0;
+    color: #4CAF50;
 }
 
-/* --- NEW: Footer Style --- */
+/* --- NEW: Legend Box Styles --- */
+#legendBox {
+    margin-top: -20px; /* Sits right below the grid */
+    grid-column: 1 / -1; /* Spans full width */
+    text-align: left;
+}
+#legendBox h3 {
+    color: #ffc107; /* Amber */
+    margin-top: 0;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+}
+.legend-color-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+}
+
+/* --- Footer Style --- */
 footer {
     text-align: center;
     margin-top: 40px;

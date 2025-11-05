@@ -153,14 +153,21 @@ export default async function handler(request, response) {
 
             let bestRank = null;
             let rankLabel = "";
+            let bestRankNum = -1;
 
-            // We prioritize Solo/Duo rank, then Flex rank
             if (soloDuo) {
                 bestRank = soloDuo;
                 rankLabel = "(Solo/Duo)";
-            } else if (flex) {
-                bestRank = flex;
-                rankLabel = "(Flex)";
+                bestRankNum = getRankNumber(soloDuo.tier);
+            }
+            
+            if (flex) {
+                const flexRankNum = getRankNumber(flex.tier);
+                // If flex rank is higher than solo/duo, or if solo/duo is unranked
+                if (flexRankNum > bestRankNum) {
+                    bestRank = flex;
+                    rankLabel = "(Flex)";
+                }
             }
 
             if (bestRank) {
@@ -206,7 +213,7 @@ export default async function handler(request, response) {
         fullMasteryList.sort((a, b) => b.points - a.points); // Sort by points by default
 
         // --- STEP 5: Get Match List (20 games) ---
-        // *** CRITICAL FIX ***: Removed queue=420 filter to get ALL recent games
+        // *** CRITICAL FIX ***: Removed queue filter to get ALL recent games
         const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20&api_key=${apiKey}`);
         if (!matchListResponse.ok) throw new Error('Could not fetch match list.');
         const matchIds = await matchListResponse.json();
@@ -216,6 +223,7 @@ export default async function handler(request, response) {
         let totalDPM = 0, totalCSPM = 0, totalKP = 0, totalMultiKills = 0, totalGameTime = 0;
         const duoPartners = {};
         const FLASH_SPELL_ID = 4;
+        let validGames = 0; // Count games that aren't remakes/bot games
 
         for (const matchId of matchIds) {
             const matchResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/${matchId}?api_key=${apiKey}`);
@@ -229,8 +237,8 @@ export default async function handler(request, response) {
             const playerInfo = matchData.info.participants.find(p => p.puuid === puuid);
             if (!playerInfo) continue;
 
+            validGames++; // This is a valid game to count
             const team = matchData.info.teams.find(t => t.teamId === playerInfo.teamId);
-            // Use 1 as a fallback for total kills to avoid divide-by-zero, though it should be >= kills
             const teamTotalKills = team ? (team.objectives.champion.kills > 0 ? team.objectives.champion.kills : 1) : 1;
 
             totalKills += playerInfo.kills;
@@ -259,9 +267,9 @@ export default async function handler(request, response) {
         }
 
         // --- STEP 7: Calculate Final Stats ---
-        const totalGames = matchIds.length;
+        const totalGames = validGames; // Use the count of valid games
         if (totalGames === 0) {
-            // Handle account with 0 recent games
+            // Handle account with 0 recent valid games
             const highlights = getStatHighlights({ rankTier, ...totalRankStats, profileIcon: profileIconId });
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
@@ -335,6 +343,8 @@ export default async function handler(request, response) {
         });
 
     } catch (error) {
-        response.status(5T00).json({ error: error.message });
+        // --- THIS IS THE FIX ---
+        // It was '5T00' and is now '500'
+        response.status(500).json({ error: error.message });
     }
 }

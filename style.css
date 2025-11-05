@@ -71,7 +71,6 @@ button:hover {
     background-color: #009acd;
 }
 
-/* --- NEW GRID LAYOUT --- */
 #resultsGrid {
     display: grid;
     grid-template-columns: 1fr; /* One column on mobile */
@@ -79,7 +78,6 @@ button:hover {
     text-align: left;
 }
 
-/* Two columns on larger screens */
 @media (min-width: 900px) {
     #resultsGrid {
         grid-template-columns: 1fr 1fr;
@@ -94,10 +92,7 @@ button:hover {
     min-height: 100px;
     line-height: 1.8;
 }
-/* --- END NEW GRID LAYOUT --- */
 
-
-/* --- NEW: op.gg icon link --- */
 .opgg-link {
     font-size: 0.8rem;
     color: #777;
@@ -114,7 +109,6 @@ button:hover {
     color: #aaa;
 }
 
-/* --- NEW: Duo partner re-search link --- */
 .duo-link {
     font-weight: bold;
     color: #00bfff;
@@ -156,19 +150,18 @@ li {
     color: #888;
     font-style: italic;
     text-align: center;
-    grid-column: 1 / -1; /* Span full width if in grid */
+    grid-column: 1 / -1; 
 }
 .error {
     color: #F44336;
     font-weight: bold;
     text-align: center;
-    grid-column: 1 / -1; /* Span full width if in grid */
+    grid-column: 1 / -1;
 }
 
-/* --- NEW: Mastery List Styles --- */
 #masterySearch {
     width: 100%;
-    box-sizing: border-box; /* Fixes padding issues */
+    box-sizing: border-box; 
     padding: 8px;
     margin-bottom: 10px;
     background-color: #333;
@@ -180,7 +173,7 @@ li {
 #masteryList {
     max-height: 400px;
     overflow-y: auto;
-    padding-right: 10px; /* For scrollbar */
+    padding-right: 10px;
 }
 
 .mastery-item {
@@ -194,7 +187,6 @@ li {
     font-weight: bold;
 }
 
-/* Color coding */
 .mastery-0 {
     background-color: #4a2d2d;
     color: #f44336;
@@ -205,5 +197,30 @@ li {
 }
 .mastery-high {
     background-color: #2f4a2d;
-    color: #4CAF50;
+    color: #4CAF5T0;
+}
+
+/* --- NEW: Footer Style --- */
+footer {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #333;
+    color: #777;
+    font-size: 0.8rem;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+footer a {
+    color: #aaa;
+    text-decoration: none;
+    margin: 0 10px;
+}
+footer a:hover {
+    text-decoration: underline;
+}
+footer p {
+    margin-top: 15px;
+    line-height: 1.5;
 }

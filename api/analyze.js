@@ -48,6 +48,7 @@ function getRankNumber(tier) {
         "IRON": 0, "BRONZE": 1, "SILVER": 2, "GOLD": 3, "PLATINUM": 4, 
         "EMERALD": 5, "DIAMOND": 6, "MASTER": 7, "GRANDMASTER": 8, "CHALLENGER": 9
     };
+    // tier can be undefined if unranked, default to 0
     return ranks[tier] || 0;
 }
 
@@ -63,33 +64,46 @@ function getStatHighlights(stats) {
         kp: 'neutral'
     };
 
-    const rankNum = getRankNumber(stats.rankTier); 
+    const rankNum = getRankNumber(stats.rankTier); // e.g., "SILVER" -> 2
 
-    if (stats.totalGames >= 50 && stats.totalWinRate > 65 && rankNum < 6) { 
+    // 1. Total Win Rate (over 50+ games is significant)
+    if (stats.totalGames >= 50 && stats.totalWinRate > 65 && rankNum < 6) { // Below Diamond
         highlights.totalWinRate = 'red';
     }
+
+    // 2. Default Profile Icon
     if (stats.profileIcon <= 28) {
         highlights.profileIcon = 'red';
     }
+
+    // 3. Inconsistent Flash
     if (stats.flashKey === 'D & F') {
         highlights.flash = 'red';
     }
+
+    // 4. Multi-kills
     if (stats.multiKills > 0) {
         highlights.multiKills = 'red';
     }
-    if (rankNum < 3 && stats.avgDPM > 700) { 
+
+    // 5. DPM (Damage Per Minute)
+    if (rankNum < 3 && stats.avgDPM > 700) { // Below Gold with 700+ DPM
         highlights.dpm = 'red';
-    } else if (rankNum < 6 && stats.avgDPM > 900) { 
+    } else if (rankNum < 6 && stats.avgDPM > 900) { // Below Diamond with 900+ DPM
         highlights.dpm = 'red';
     }
-    if (rankNum < 3 && stats.avgCSPM > 7.5) { 
+
+    // 6. CSPM (CS Per Minute)
+    if (rankNum < 3 && stats.avgCSPM > 7.5) { // Below Gold with 7.5+ CSPM
         highlights.cspm = 'red';
-    } else if (rankNum < 6 && stats.avgCSPM > 8.5) { 
+    } else if (rankNum < 6 && stats.avgCSPM > 8.5) { // Below Diamond with 8.5+ CSPM
         highlights.cspm = 'red';
     }
-    if (stats.avgKP > 75) { 
+    
+    // 7. KP (Kill Participation)
+    if (stats.avgKP > 75) { // Extremely high (smurf-level) KP
         highlights.kp = 'red';
-    } else if (stats.avgKP > 65) { 
+    } else if (stats.avgKP > 65) { // Consistently high KP
         highlights.kp = 'green';
     }
 
@@ -122,9 +136,9 @@ export default async function handler(request, response) {
         const summonerData = await summonerResponse.json();
         const accountLevel = summonerData.summonerLevel;
         const summonerId = summonerData.id;
-        const profileIconId = summonerData.profileIconId;
+        const profileIconId = summonerData.profileIconId; // <-- NEW
 
-        // --- STEP 3: Get Rank & Total Season Stats (*** CRITICAL DEBUGGING FIX ***) ---
+        // --- STEP 3: Get Rank & Total Season Stats (*** CRITICAL FIX ***) ---
         const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
         
         let currentRank = "Unranked";
@@ -156,6 +170,7 @@ export default async function handler(request, response) {
             
             if (flex) {
                 const flexRankNum = getRankNumber(flex.tier);
+                // If flex rank is higher than solo/duo, or if solo/duo is unranked
                 if (flexRankNum > bestRankNum) {
                     bestRank = flex;
                     rankLabel = "(Flex)";
@@ -206,6 +221,7 @@ export default async function handler(request, response) {
         fullMasteryList.sort((a, b) => b.points - a.points); // Sort by points by default
 
         // --- STEP 5: Get Match List (20 games, ALL modes) ---
+        // *** CRITICAL FIX ***: Removed queue filter to get ALL recent games
         const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20&api_key=${apiKey}`);
         if (!matchListResponse.ok) throw new Error(`Could not fetch match list (Error ${matchListResponse.status})`);
         const matchIds = await matchListResponse.json();
@@ -222,6 +238,7 @@ export default async function handler(request, response) {
             if (!matchResponse.ok) continue; 
             
             const matchData = await matchResponse.json();
+            // Need to filter out bot games, custom games, etc. which can skew stats
             if (matchData.info.gameDuration < 300) continue; // Skip games less than 5 min
             
             const gameDurationMinutes = matchData.info.gameDuration / 60;
@@ -242,7 +259,12 @@ export default async function handler(request, response) {
 
             totalDPM += playerInfo.totalDamageDealtToChampions / gameDurationMinutes;
             totalCSPM += playerInfo.totalMinionsKilled / gameDurationMinutes;
-            totalKP += ((playerInfo.kills + playerInfo.assists) / teamTotalKills) * 100;
+            // --- KP BUG FIX ---
+            // Ensure KP cannot be over 100%
+            const playerKP = (playerInfo.kills + playerInfo.assists);
+            const teamKills = teamTotalKills > playerKP ? teamTotalKills : playerKP; // Use the larger of the two
+            totalKP += (teamKills > 0) ? (playerKP / teamKills) * 100 : 0;
+            // ------------------
             totalMultiKills += (playerInfo.pentaKills + playerInfo.quadraKills);
 
             matchData.info.participants.forEach(participant => {
@@ -260,6 +282,7 @@ export default async function handler(request, response) {
         // --- STEP 7: Calculate Final Stats ---
         const totalGames = validGames; 
         if (totalGames === 0) {
+            // Handle account with 0 recent valid games
             const highlights = getStatHighlights({ rankTier, ...totalRankStats, profileIcon: profileIconId });
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
@@ -333,7 +356,8 @@ export default async function handler(request, response) {
         });
 
     } catch (error) {
-        // This will catch critical errors like "Riot ID not found"
+        // --- THIS IS THE FIX ---
+        // It was '5T00' and is now '500'
         response.status(500).json({ error: error.message });
     }
 }

@@ -251,4 +251,21 @@ document.addEventListener('DOMContentLoaded', () => {
             legendHtml += `
                 <div class="legend-item">
                     <div class="legend-color-box stat-red" style="background-color: #4a2d2d;"></div>
-                    <span><b>High Stats / Inconsistency:</b> One
+                    <span><b>High Stats / Inconsistency:</b> One or more stats (Win Rate, DPM, KP, Flash Key) are significant outliers, which can indicate a smurf, a shared, or a boosted account.</span>
+                </div>
+            `;
+            items++;
+        }
+        
+        legendHtml += `
+            <div class="legend-item">
+                <div class="legend-color-box mastery-0" style="background-color: #4a2d2d;"></div>
+                <span><b>Mastery 0:</b> Player has no mastery on this champion. High performance on a 0-mastery champ is a potential smurf indicator for tournament play.</span>
+            </div>
+        `;
+        items++;
+
+        legendBox.innerHTML = legendHtml;
+        legendBox.style.display = 'block';
+    }
+});

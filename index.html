@@ -4,331 +4,80 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ranked Stats Viewer</title>
-    <!-- We'll use Tailwind for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
+    <link rel="stylesheet" href="styles.css">
     <!-- Inter Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8">
+<body>
 
-    <div class="max-w-4xl mx-auto">
-        <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Ranked Stats Viewer</h1>
+    <div class="container">
+        <h1>Ranked Stats Viewer</h1>
 
-        <!-- 
-        =======================================================================
-        !!! CRITICAL SECURITY WARNING !!!
-        =======================================================================
-        
-        DO NOT put your REAL API key here if this website is public.
-        Your key will be stolen in seconds.
-
-        This file is for testing the logic ONLY.
-
-        For a REAL application, you MUST have a backend server (like Node.js)
-        that hides your key. The server makes the API call, and this
-        HTML file calls your server.
-        
-        This `API_KEY` variable is just a placeholder for testing.
-        
-        =======================================================================
-        -->
-        <script>
-            // Replace with your 24-hour development key for testing
-            const API_KEY = "RGAPI-YOUR_API_KEY_HERE"; 
-        </script>
-
-        <!-- Search Bar -->
-        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
-            <div class="flex flex-col sm:flex-row gap-4">
-                <input type="text" id="summonerName" placeholder="Summoner Name (e.g., Tenmo)" class="flex-grow bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <select id="region" class="bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="na1">NA</option>
-                    <option value="euw1">EUW</option>
-                    <option value="eun1">EUNE</option>
-                    <option value="kr">KR</option>
-                    <!-- Add other regions as needed -->
-                </select>
-                <button id="searchButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold p-3 rounded-md transition-all">
-                    Search
-                </button>
-            </div>
+        <!-- Search Box (UPDATED) -->
+        <div class="search-box">
+            <input type="text" id="gameName" placeholder="Game Name (e.g., Tenmo)">
+            <input type="text" id="tagLine" placeholder="Tag Line (e.g., NA1)">
+            
+            <select id="region">
+                <option value="na1">NA</option>
+                <option value="euw1">EUW</option>
+                <option value="eun1">EUNE</option>
+                <option value="kr">KR</option>
+                <!-- Add other regions as needed -->
+            </select>
+            <button id="searchButton">Search</button>
         </div>
 
         <!-- Loading Spinner -->
-        <div id="loading" class="text-center py-10" style="display: none;">
-            <svg class="animate-spin h-10 w-10 text-blue-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="mt-4 text-lg">Fetching ranked data...</p>
+        <div id="loading" class="loading-spinner" style="display: none;">
+            <div class="spinner"></div>
+            <p>Fetching ranked data...</p>
         </div>
 
         <!-- Error Message -->
-        <div id="error" class="text-center py-10 text-red-400 text-xl" style="display: none;"></div>
+        <div id="error" class="error-message" style="display: none;"></div>
 
         <!-- Results -->
-        <div id="results" class="grid grid-cols-1 md:grid-cols-3 gap-8" style="display: none;">
+        <div id="results" class="results-grid" style="display: none;">
             
             <!-- Column 1: Summoner Info & Rank -->
-            <div class="md:col-span-1 bg-gray-800 p-6 rounded-lg shadow-lg">
-                <div id="summoner-info" class="text-center">
-                    <img id="profileIcon" src="https://placehold.co/100x100/1f2937/9ca3af?text=Icon" alt="Profile Icon" class="w-24 h-24 rounded-full mx-auto border-4 border-gray-600">
-                    <h2 id="summonerNameDisplay" class="text-2xl font-bold mt-4">---</h2>
-                    <p id="summonerLevel" class="text-gray-400">Level ---</p>
+            <div class="card" id="profile-card">
+                <div id="summoner-info" class="summoner-info">
+                    <img id="profileIcon" src="https://placehold.co/100x100/1f2937/9ca3af?text=Icon" alt="Profile Icon" class="profile-icon">
+                    <!-- This will now show GameName#TagLine -->
+                    <h2 id="summonerNameDisplay">---</h2>
+                    <p id="summonerLevel">Level ---</p>
                 </div>
                 
-                <hr class="my-6 border-gray-700">
+                <hr class="divider">
 
                 <!-- RANKED STATS WILL GO HERE -->
-                <div id="ranked-stats" class="space-y-4">
-                    <h3 class="text-xl font-semibold text-blue-300 mb-2 text-center">Ranked Solo/Duo</h3>
-                    <div id="rank-display" class="text-center">
-                        <img id="rankIcon" src="https://placehold.co/128x128/1f2937/9ca3af?text=Rank" alt="Rank Icon" class="w-32 h-32 mx-auto mb-2">
-                        <p id="rankTier" class="text-xl font-bold">UNRANKED</p>
-                        <p id="rankLP" class="text-gray-300">--- LP</p>
-                        <p id="rankWinLoss" class="text-gray-400">---W / ---L</p>
+                <div id="ranked-stats">
+                    <h3 class="rank-header">Ranked Solo/Duo</h3>
+                    <div id="rank-display" class="rank-display">
+                        <img id="rankIcon" src="https://placehold.co/128x128/1f2937/9ca3af?text=Rank" alt="Rank Icon" class="rank-icon">
+                        <p id="rankTier" class="rank-tier">UNRANKED</p>
+                        <p id="rankLP" class="rank-lp">--- LP</p>
+                        <p id="rankWinLoss" class="rank-winloss">---W / ---L</p>
                     </div>
                 </div>
             </div>
 
             <!-- Column 2: Match History -->
-            <div class="md:col-span-2 bg-gray-800 p-6 rounded-lg shadow-lg">
-                <h3 class="text-2xl font-semibold text-blue-300 mb-4">Ranked Match History</h3>
-                <div id="match-history" class="space-y-4">
-                    <!-- Match history items will be injected here -->
-                    <p class="text-gray-400">No ranked games found or data is loading...</p>
+            <div class="card" id="match-history-card">
+                <h3 class="card-header">Ranked Match History</h3>
+                <div id="match-history" class="match-history-list">
+                    <p class="text-gray">No ranked games found or data is loading...</p>
                 </div>
             </div>
 
         </div>
     </div>
 
-    <script>
-        const searchButton = document.getElementById('searchButton');
-        const summonerNameInput = document.getElementById('summonerName');
-        const regionSelect = document.getElementById('region');
-
-        const loadingDiv = document.getElementById('loading');
-        const errorDiv = document.getElementById('error');
-        const resultsDiv = document.getElementById('results');
-
-        // Display elements
-        const profileIcon = document.getElementById('profileIcon');
-        const summonerNameDisplay = document.getElementById('summonerNameDisplay');
-        const summonerLevel = document.getElementById('summonerLevel');
-        
-        const rankIcon = document.getElementById('rankIcon');
-        const rankTier = document.getElementById('rankTier');
-        const rankLP = document.getElementById('rankLP');
-        const rankWinLoss = document.getElementById('rankWinLoss');
-
-        const matchHistoryDiv = document.getElementById('match-history');
-
-        // Data Dragon version (for icons)
-        const DATA_DRAGON_VERSION = "13.21.1"; // You should fetch this dynamically in a real app
-
-        searchButton.addEventListener('click', searchPlayer);
-
-        async function searchPlayer() {
-            const summonerName = summonerNameInput.value.trim();
-            const region = regionSelect.value;
-            
-            if (!summonerName) {
-                showError("Please enter a summoner name.");
-                return;
-            }
-
-            // --- Reset UI ---
-            loadingDiv.style.display = 'block';
-            resultsDiv.style.display = 'none';
-            errorDiv.style.display = 'none';
-            // Clear old data
-            matchHistoryDiv.innerHTML = '<p class="text-gray-400">Loading matches...</p>';
-            rankTier.textContent = "UNRANKED";
-            rankIcon.src = `https://placehold.co/128x128/1f2937/9ca3af?text=Rank`;
-            rankLP.textContent = "--- LP";
-            rankWinLoss.textContent = "---W / ---L";
-
-            try {
-                // --- Step 1: Get Summoner Data (Name, Level, PUUID, and Encrypted ID) ---
-                // We need this for all other calls.
-                const summoner = await getSummonerData(summonerName, region);
-
-                // Display basic info immediately
-                profileIcon.src = `https://ddragon.leagueoflegends.com/cdn/${DATA_DRAGON_VERSION}/img/profileicon/${summoner.profileIconId}.png`;
-                summonerNameDisplay.textContent = summoner.name;
-                summonerLevel.textContent = `Level ${summoner.summonerLevel}`;
-
-                // --- Step 2: Kick off both API calls at the same time ---
-                // This is more efficient than waiting for one to finish.
-                const [rankData, matchIds] = await Promise.all([
-                    getRankData(summoner.id, region), // Use 'id' (encryptedSummonerId)
-                    getMatchHistory(summoner.puuid, region) // Use 'puuid'
-                ]);
-
-                // --- Step 3: Process and Display Rank Data ---
-                displayRankData(rankData);
-
-                // --- Step 4: Process and Display Match History ---
-                displayMatchHistory(matchIds, region, summoner.puuid);
-
-                // Show results
-                loadingDiv.style.display = 'none';
-                resultsDiv.style.display = 'grid';
-
-            } catch (err) {
-                showError(err.message);
-            }
-        }
-
-        async function getSummonerData(name, region) {
-            const url = `https://${region}.api.riotgames.com/lol/summoner/v4/summoners/by-name/${name}?api_key=${API_KEY}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Summoner not found (Error ${response.status})`);
-            }
-            return response.json();
-            // This object contains:
-            // - id (This is the 'encryptedSummonerId' for the LEAGUE-V4 endpoint)
-            // - puuid (This is for the 'MATCH-V5' endpoint)
-            // - name, profileIconId, summonerLevel
-        }
-
-        // =================================================================
-        // THIS IS THE FIX FOR RANKED STATS
-        // =================================================================
-        async function getRankData(encryptedSummonerId, region) {
-            const url = `https://${region}.api.riotgames.com/lol/league/v4/entries/by-summoner/${encryptedSummonerId}?api_key=${API_KEY}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Could not fetch rank data (Error ${response.status})`);
-            }
-            return response.json();
-            // This returns an array []. We need to find the "RANKED_SOLO_5x5" object.
-        }
-
-        function displayRankData(rankData) {
-            // Find the entry for Ranked Solo/Duo
-            const soloQueueEntry = rankData.find(entry => entry.queueType === "RANKED_SOLO_5x5");
-
-            if (soloQueueEntry) {
-                const tier = soloQueueEntry.tier.toUpperCase(); // e.g., "GOLD"
-                const rank = soloQueueEntry.rank; // e.g., "IV"
-                const wins = soloQueueEntry.wins;
-                const losses = soloQueueEntry.losses;
-
-                rankIcon.src = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-shared-components/global/default/images/ranked-emblem-${tier.toLowerCase()}.png`;
-                rankTier.textContent = `${tier} ${rank}`;
-                rankLP.textContent = `${soloQueueEntry.leaguePoints} LP`;
-                rankWinLoss.textContent = `${wins}W / ${losses}L`;
-            } else {
-                // User is unranked
-                rankIcon.src = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-shared-components/global/default/images/ranked-emblem-unranked.png`;
-                rankTier.textContent = "UNRANKED";
-                rankLP.textContent = "--- LP";
-                rankWinLoss.textContent = "0W / 0L";
-            }
-        }
-
-        // =================================================================
-        // THIS IS THE FIX FOR "RANKED ONLY" GAMES
-        // =================================================================
-        async function getMatchHistory(puuid, region) {
-            // We adjust the region for the MATCH endpoint (e.g., 'na1' -> 'americas')
-            const regionMap = {
-                'na1': 'americas', 'br1': 'americas', 'la1': 'americas', 'la2': 'americas',
-                'euw1': 'europe', 'eun1': 'europe', 'tr1': 'europe', 'ru': 'europe',
-                'kr': 'asia', 'jp1': 'asia',
-                // Add more as needed
-            };
-            const matchRegion = regionMap[region] || 'americas';
-            
-            // We add '&type=ranked' to the URL
-            // We also ask for just 5 matches ('&count=5')
-            const url = `https://${matchRegion}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?type=ranked&start=0&count=5&api_key=${API_KEY}`;
-            
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Could not fetch match history (Error ${response.status})`);
-            }
-            return response.json(); // This returns an array of match IDs [ "NA1_123", "NA1_456" ]
-        }
-
-        async function displayMatchHistory(matchIds, region, puuid) {
-            if (matchIds.length === 0) {
-                matchHistoryDiv.innerHTML = '<p class="text-gray-400">No recent ranked games found.</p>';
-                return;
-            }
-
-            // Clear loading text
-            matchHistoryDiv.innerHTML = '';
-            
-            const regionMap = {
-                'na1': 'americas', 'br1': 'americas', 'la1': 'americas', 'la2': 'americas',
-                'euw1': 'europe', 'eun1': 'europe', 'tr1': 'europe', 'ru': 'europe',
-                'kr': 'asia', 'jp1': 'asia',
-            };
-            const matchRegion = regionMap[region] || 'americas';
-
-            // We fetch details for each match ID
-            for (const matchId of matchIds) {
-                try {
-                    const matchUrl = `https://${matchRegion}.api.riotgames.com/lol/match/v5/matches/${matchId}?api_key=${API_KEY}`;
-                    const matchResponse = await fetch(matchUrl);
-                    const matchData = await matchResponse.json();
-
-                    // Find our player in the match data
-                    const playerInfo = matchData.info.participants.find(p => p.puuid === puuid);
-                    
-                    if (playerInfo) {
-                        const card = createMatchCard(playerInfo, matchData.info);
-                        matchHistoryDiv.appendChild(card);
-                    }
-                } catch (err) {
-                    console.error(`Failed to load match ${matchId}:`, err);
-                    // Don't stop the loop, just skip this match
-                }
-            }
-        }
-
-        function createMatchCard(player, info) {
-            const card = document.createElement('div');
-            const win = player.win;
-            card.className = `flex items-center p-4 rounded-lg shadow ${win ? 'bg-blue-900' : 'bg-red-900'} border-l-4 ${win ? 'border-blue-500' : 'border-red-500'}`;
-
-            const gameMode = info.gameMode; // e.g., "CLASSIC"
-            const gameType = info.queueId === 420 ? "Ranked Solo/Duo" : "Ranked Flex"; // Queue ID 420 is Solo/Duo
-            const duration = (info.gameDuration / 60).toFixed(0); // in minutes
-
-            card.innerHTML = `
-                <div class="flex-shrink-0">
-                    <img src="https://ddragon.leagueoflegends.com/cdn/${DATA_DRAGON_VERSION}/img/champion/${player.championName}.png" alt="${player.championName}" class="w-16 h-16 rounded-md">
-                </div>
-                <div class="ml-4 flex-grow">
-                    <p class="text-lg font-bold">${win ? 'VICTORY' : 'DEFEAT'}</p>
-                    <p class="text-sm text-gray-300">${gameType} (${duration} mins)</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-xl font-bold">${player.kills} / ${player.deaths} / ${player.assists}</p>
-                    <p class="text-sm text-gray-300">KDA: ${((player.kills + player.assists) / (player.deaths || 1)).toFixed(2)}</p>
-                </div>
-            `;
-            return card;
-        }
-
-        function showError(message) {
-            loadingDiv.style.display = 'none';
-            resultsDiv.style.display = 'none';
-            errorDiv.style.display = 'block';
-            errorDiv.textContent = `Error: ${message}. Please check the summoner name and region, or try a new API key.`;
-        }
-
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
+
 

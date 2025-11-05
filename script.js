@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const legendBox = document.getElementById('legendBox');
 
     let currentMasteryData = []; // Store mastery data for sorting
-    let masterySortState = 'level'; // 'level' or 'alpha'
-
+    let masterySortState = 'level_desc'; // NEW: 4-state sort
+    
     // Store the analyzePlayer function globally to make it clickable from generated HTML
     window.currentAnalysis = {
         analyzePlayer: analyzePlayer
@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tagLineInput.addEventListener('keypress', (e) => e.key === 'Enter' && analyzePlayer());
 
     // --- Helper Functions ---
+
     function getOpGgRegion(platformId) {
         const regionMap = {
             'na1': 'na', 'euw1': 'euw', 'eun1': 'eune', 'kr': 'kr', 'br1': 'br',
@@ -91,6 +92,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const playerLink = buildOpGgLink(data.searchedPlayer.gameName, data.searchedPlayer.tagLine, region);
         
         // --- Create all stat display elements ---
+        
+        // *** THIS IS THE RANK FIX ***
+        // We now correctly display the data.currentRank string passed from the API
+        const currentRankDisplay = createStatDisplay(data.currentRank, 'neutral');
+        // ***************************
+
         const totalRankDisplay = createStatDisplay(data.totalRank.display, data.highlights.totalWinRate);
         const profileIconDisplay = createStatDisplay(data.profileIcon.isDefault ? "Yes" : "No", data.highlights.profileIcon);
         const flashDisplay = createStatDisplay(data.flashKey, data.highlights.flash);
@@ -137,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="result-item"><strong>Account Level:</strong> <span class="result-value">${data.accountLevel}</span></div>
             <div class="result-item"><strong>Default Icon:</strong> <span class="result-value">${profileIconDisplay}</span></div>
             <hr>
-            <div class="result-item"><strong>Current Rank:</strong> <span class="result-value">${data.currentRank}</span></div>
+            <div class="result-item"><strong>Current Rank:</strong> <span class="result-value">${currentRankDisplay}</span></div>
             <div class="result-item"><strong>Total Ranked:</strong> <span class="result-value">${totalRankDisplay}</span></div>
             <hr>
             <div class="result-item"><strong>Recent 20 (Ranked):</strong> <span class="result-value">${recentWinRateDisplay}</span></div>
@@ -160,40 +167,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         currentMasteryData = masteryData; // Save for sorting
-        masterySortState = 'level'; // Default sort
+        masterySortState = 'level_desc'; // Default sort (High-Low)
 
         masteryBox.innerHTML = `
             <h3>Champion Mastery (All)</h3>
             <div class="mastery-controls">
                 <input type="text" id="masterySearch" placeholder="Search champions...">
-                <button id="masterySortButton">Sort A-Z</button>
+                <button id="masterySortButton">Sort Low-High</button>
             </div>
             <div id="masteryList"></div>
         `;
 
-        drawMasteryList(); // Initial draw
+        drawMasteryList(); // Initial draw (already sorted High-Low from API)
 
         document.getElementById('masterySearch').addEventListener('keyup', (e) => {
             drawMasteryList(e.target.value.toLowerCase());
         });
 
+        // --- NEW: 4-State Sort Logic ---
         document.getElementById('masterySortButton').addEventListener('click', () => {
             const button = document.getElementById('masterySortButton');
-            if (masterySortState === 'level') {
-                masterySortState = 'alpha';
-                button.textContent = 'Sort by Mastery';
-                currentMasteryData.sort((a, b) => a.name.localeCompare(b.name));
-            } else {
-                masterySortState = 'level';
+            
+            if (masterySortState === 'level_desc') {
+                masterySortState = 'level_asc';
                 button.textContent = 'Sort A-Z';
-                currentMasteryData.sort((a, b) => b.points - a.points);
+                currentMasteryData.sort((a, b) => a.points - b.points); // Low-High
+            } else if (masterySortState === 'level_asc') {
+                masterySortState = 'alpha_asc';
+                button.textContent = 'Sort Z-A';
+                currentMasteryData.sort((a, b) => a.name.localeCompare(b.name)); // A-Z
+            } else if (masterySortState === 'alpha_asc') {
+                masterySortState = 'alpha_desc';
+                button.textContent = 'Sort High-Low';
+                currentMasteryData.sort((a, b) => b.name.localeCompare(a.name)); // Z-A
+            } else { // 'alpha_desc'
+                masterySortState = 'level_desc';
+                button.textContent = 'Sort Low-High';
+                currentMasteryData.sort((a, b) => b.points - a.points); // High-Low
             }
+            
             drawMasteryList(document.getElementById('masterySearch').value);
         });
     }
 
     function drawMasteryList(searchTerm = '') {
         const listElement = document.getElementById('masteryList');
+        if (!listElement) return; // Guard clause
+        
         let masteryHtml = '';
 
         for (const champ of currentMasteryData) {
@@ -224,39 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let legendHtml = '<h3>* Potential Smurf Indicators</h3>';
         let items = 0;
 
-        if (highlights.totalWinRate === 'red' || highlights.dpm === 'red' || highlights.cspm === 'red' || highlights.kp === 'red' || highlights.multiKills === 'red' || highlights.profileIcon === 'red') {
-            legendHtml += `
-                <div class="legend-item">
-                    <div class="legend-color-box stat-red" style="background-color: #4a2d2d;"></div>
-                    <span><b>High Stats for Rank:</b> Player's stats (Win Rate, DPM, CSPM, KP) are unusually high for their current rank.</span>
-                </div>
-            `;
-            items++;
-        }
-        if (highlights.flash === 'red') {
-            legendHtml += `
-                <div class="legend-item">
-                    <div class="legend-color-box stat-red" style="background-color: #4a2d2d;"></div>
-                    <span><b>Inconsistent Flash:</b> Player uses both D and F for Flash. This can indicate an account is shared or being played by someone else.</span>
-                </div>
-            `;
-            items++;
-        }
-        
-        // Always show the mastery 0 legend
-        legendHtml += `
-            <div class="legend-item">
-                <div class="legend-color-box mastery-0" style="background-color: #4a2d2d;"></div>
-                <span><b>Mastery 0:</b> Player has no mastery on this champion. High performance on a 0-mastery champ is a potential smurf indicator.</span>
-            </div>
-        `;
-        items++;
+        // Check all highlights. If any are 'red', we add the legend.
+        const hasRedStat = Object.values(highlights).some(value => value === 'red');
 
-        if (items > 0) {
-            legendBox.innerHTML = legendHtml;
-            legendBox.style.display = 'block';
-        } else {
-            legendBox.style.display = 'none';
-        }
-    }
-});
+        if (hasRedStat) {
+            legendHtml += `
+                <div class="legend-item">
+                    <div class="legend-color-box stat-red" style="background-color: #4a2d2d;"></div>
+                    <span><b>High Stats / Inconsistency:</b> One

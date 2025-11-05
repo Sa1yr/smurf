@@ -32,13 +32,13 @@ async function getChampionMap() {
         const map = {};
         for (const champName in champData.data) {
             const champ = champData.data[champName];
-            map[champ.key] = champ.name; // Map ID (e.g., "266") to Name (e.g., "Aatrox")
+            map[champ.key] = { id: champ.key, name: champ.name }; // Store both ID and Name
         }
         championMap = map;
         return championMap;
     } catch (e) {
         console.error("Failed to fetch champion map:", e);
-        return {}; // Return empty map on failure
+        return {}; 
     }
 }
 
@@ -65,31 +65,63 @@ export default async function handler(request, response) {
         if (!summonerResponse.ok) throw new Error('Summoner data not found on that platform.');
         const summonerData = await summonerResponse.json();
         const accountLevel = summonerData.summonerLevel;
-        const summonerId = summonerData.id; // <-- We need this for rank
+        const summonerId = summonerData.id; 
 
-        // --- STEP 3: Get Highest Rank (NEW) ---
+        // --- STEP 3: Get Current Rank (Label fixed) ---
         const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
-        let highestRank = "Unranked";
+        let currentRank = "Unranked";
         if (rankResponse.ok) {
             const rankData = await rankResponse.json();
             const soloDuo = rankData.find(q => q.queueType === "RANKED_SOLO_5x5");
             if (soloDuo) {
-                highestRank = `${soloDuo.tier} ${soloDuo.rank} (${soloDuo.leaguePoints} LP)`;
+                currentRank = `${soloDuo.tier} ${soloDuo.rank} (${soloDuo.leaguePoints} LP)`;
             }
         }
 
-        // --- STEP 4: Get Champion Mastery (NEW) ---
-        const champMap = await getChampionMap(); // Get champion name mapping
+        // --- STEP 4: Get Champion Mastery (NEW LOGIC) ---
+        // 4a. Get the full list of all champions from Data Dragon
+        const allChampsMap = await getChampionMap();
+        
+        // 4b. Get the player's personal mastery list
         const masteryResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}?api_key=${apiKey}`);
-        let mastery = [];
+        
+        // 4c. Create a temporary map of the player's points
+        const playerMasteryMap = new Map();
         if (masteryResponse.ok) {
             const masteryData = await masteryResponse.json();
-            mastery = masteryData.map(champ => ({
-                name: champMap[champ.championId] || `ID ${champ.championId}`,
-                level: champ.championLevel,
-                points: champ.championPoints
-            }));
+            masteryData.forEach(champ => {
+                playerMasteryMap.set(champ.championId.toString(), {
+                    level: champ.championLevel,
+                    points: champ.championPoints
+                });
+            });
         }
+
+        // 4d. Create the full list, merging player data with the master list
+        const fullMasteryList = [];
+        for (const champId in allChampsMap) {
+            const champName = allChampsMap[champId].name;
+            const playerStats = playerMasteryMap.get(champId);
+
+            if (playerStats) {
+                // Player has mastery on this champ
+                fullMasteryList.push({
+                    name: champName,
+                    level: playerStats.level,
+                    points: playerStats.points
+                });
+            } else {
+                // Player has 0 mastery on this champ
+                fullMasteryList.push({
+                    name: champName,
+                    level: 0,
+                    points: 0
+                });
+            }
+        }
+        // Sort by points by default (highest first)
+        fullMasteryList.sort((a, b) => b.points - a.points);
+
 
         // --- STEP 5: Get Match List (20 games) ---
         const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20&api_key=${apiKey}`);
@@ -136,12 +168,12 @@ export default async function handler(request, response) {
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
                 accountLevel,
-                highestRank,
+                currentRank,
                 totalGames: 0, wins: 0, losses: 0, winRate: 0,
                 avgKills: 0, avgDeaths: 0, avgAssists: 0, avgKDA: 0,
                 flashKey: "N/A",
                 duoList: [],
-                mastery: mastery
+                mastery: fullMasteryList
             });
         }
         
@@ -163,13 +195,13 @@ export default async function handler(request, response) {
                 duoList.push({ name: partner, games: duoPartners[partner] });
             }
         }
-        duoList.sort((a, b) => b.games - a.games); // Sort by most games
+        duoList.sort((a, b) => b.games - a.games);
 
         // --- STEP 8: Send all data back to frontend ---
         response.status(200).json({
             searchedPlayer: { gameName: name, tagLine: tag },
             accountLevel,
-            highestRank,
+            currentRank,
             totalGames,
             wins,
             losses,
@@ -180,7 +212,7 @@ export default async function handler(request, response) {
             avgKDA,
             flashKey,
             duoList,
-            mastery
+            mastery: fullMasteryList // Send the new complete list
         });
 
     } catch (error) {

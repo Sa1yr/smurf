@@ -1,342 +1,281 @@
+/* General Styling */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #121212;
-    color: #e0e0e0;
+    font-family: 'Inter', sans-serif;
+    background-color: #111827; /* Dark gray-blue */
+    color: #F3F4F6; /* Light gray */
+    min-height: 100vh;
+    padding: 2rem;
     margin: 0;
-    padding: 20px;
 }
 
-main {
-    width: 100%;
-    max-width: 1200px;
+.container {
+    max-width: 1024px;
     margin: 0 auto;
-    text-align: center;
 }
 
 h1 {
-    color: #00bfff;
+    font-size: 2.25rem;
+    font-weight: 700;
+    text-align: center;
+    color: #60A5FA; /* Light Blue */
+    margin-bottom: 1.5rem;
 }
 
-.search-container {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
-    margin-bottom: 24px;
+/* Search Box (UPDATED) */
+.search-box {
+    background-color: #1F2937; /* Gray 800 */
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-@media (min-width: 768px) {
-    .search-container {
-        grid-template-columns: 1fr 2fr 0.2fr 1fr 1.5fr;
-        align-items: center;
+@media (min-width: 640px) {
+    .search-box {
+        flex-direction: row;
     }
 }
 
-.tag-divider {
-    font-size: 1.5rem;
-    color: #555;
-    padding-top: 5px;
-    display: none;
-}
-@media (min-width: 768px) {
-    .tag-divider { display: block; }
-}
-
-select,
-input[type="text"] {
-    background-color: #222;
-    color: #fff;
-    border: 1px solid #444;
-    border-radius: 4px;
-    padding: 10px;
+.search-box input[type="text"],
+.search-box select {
+    background-color: #374151; /* Gray 700 */
+    color: #F3F4F6;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid #4B5563; /* Gray 600 */
     font-size: 1rem;
-    box-sizing: border-box;
-    width: 100%;
 }
 
-select {
-    cursor: pointer;
+.search-box input[type="text"] {
+    flex-grow: 1;
 }
 
-input#tagLineInput {
-    text-transform: uppercase;
+/* Specific style for the new tagLine input */
+#tagLine {
+    flex-grow: 0.5;
+    min-width: 100px;
 }
 
-button {
-    background-color: #00bfff;
-    color: #121212;
+.search-box select {
+    flex-grow: 0;
+}
+
+.search-box input[type="text"]:focus,
+.search-box select:focus {
+    outline: none;
+    border-color: #3B82F6; /* Blue 500 */
+    box-shadow: 0 0 0 2px #3B82F6;
+}
+
+.search-box button {
+    background-color: #2563EB; /* Blue 600 */
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
     border: none;
-    border-radius: 4px;
-    padding: 10px 20px;
-    font-size: 1rem;
-    font-weight: bold;
+    border-radius: 0.375rem;
     cursor: pointer;
     transition: background-color 0.2s;
-    width: 100%;
-}
-@media (min-width: 768px) {
-    button { width: auto; }
 }
 
-button:hover {
-    background-color: #009acd;
+.search-box button:hover {
+    background-color: #1D4ED8; /* Blue 700 */
 }
 
-#resultsGrid {
+/* Loading & Error */
+.loading-spinner {
+    text-align: center;
+    padding: 2.5rem;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid #60A5FA; /* Light Blue */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-message {
+    text-align: center;
+    padding: 2.5rem;
+    color: #F87171; /* Red 400 */
+    font-size: 1.25rem;
+}
+
+/* Results Grid */
+.results-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 20px;
-    text-align: left;
+    gap: 2rem;
 }
 
-@media (min-width: 900px) {
-    #resultsGrid {
-        grid-template-columns: 1fr 1fr;
+@media (min-width: 768px) {
+    .results-grid {
+        grid-template-columns: 1fr 2fr;
     }
 }
 
-.results-box {
-    background-color: #1a1a1a;
-    border: 1px solid #333;
-    border-radius: 8px;
-    padding: 20px;
-    min-height: 100px;
-    line-height: 1.8;
+.card {
+    background-color: #1F2937; /* Gray 800 */
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.results-box h3 {
+.card-header {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #60A5FA; /* Light Blue */
     margin-top: 0;
-    margin-bottom: 8px;
+    margin-bottom: 1rem;
+}
+
+/* Profile Card */
+.summoner-info {
+    text-align: center;
+}
+
+.profile-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    margin: 0 auto;
+    border: 4px solid #4B5563; /* Gray 600 */
+}
+
+.summoner-info h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.summoner-info p {
+    color: #9CA3AF; /* Gray 400 */
     font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    margin: 0;
 }
 
-.results-box hr {
-    border: none;
-    border-top: 1px solid #333;
-    margin: 15px 0;
+.divider {
+    margin: 1.5rem 0;
+    border: 0;
+    border-top: 1px solid #374151; /* Gray 700 */
 }
 
-.opgg-link {
-    font-size: 0.8rem;
-    color: #777;
-    text-decoration: none;
-    margin-left: 8px;
-    font-weight: bold;
-    border: 1px solid #444;
-    padding: 1px 4px;
-    border-radius: 3px;
-    white-space: nowrap;
-}
-.opgg-link:hover {
-    background-color: #333;
-    color: #aaa;
+/* Rank Display */
+.rank-header {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #93C5FD; /* Blue 300 */
+    text-align: center;
+    margin-bottom: 0.5rem;
 }
 
-.duo-link {
-    font-weight: bold;
-    color: #00bfff;
-    cursor: pointer;
-    text-decoration: none;
-}
-.duo-link:hover {
-    text-decoration: underline;
+.rank-display {
+    text-align: center;
 }
 
-.result-item {
-    font-size: 1rem;
-    padding: 4px 0;
+.rank-icon {
+    width: 128px;
+    height: 128px;
+    margin: 0 auto 0.5rem;
+}
+
+.rank-tier {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.rank-lp {
+    color: #D1D5DB; /* Gray 300 */
+    margin: 0.25rem 0;
+}
+
+.rank-winloss {
+    color: #9CA3AF; /* Gray 400 */
+    margin: 0;
+}
+
+/* Match History Card */
+.match-history-list {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    flex-direction: column;
+    gap: 1rem;
 }
-.result-item strong {
-    color: #00bfff;
-    min-width: 150px;
-    display: inline-block;
-    padding-right: 10px;
-    flex-shrink: 0;
+
+.text-gray {
+    color: #9CA3AF; /* Gray 400 */
 }
-.result-value {
-    font-weight: bold;
-    text-align: right;
-    white-space: nowrap;
+
+.match-card {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border-left: 5px solid;
 }
 
-/* Stat Highlight Classes */
-.stat-red {
-    color: #F44336;
-}
-.stat-green {
-    color: #4CAF50;
-}
-.stat-neutral {
-    color: #e0e0e0;
+.match-card.victory {
+    background-color: #1E3A8A; /* Dark Blue 900 */
+    border-color: #3B82F6; /* Blue 500 */
 }
 
-ul {
-    padding-left: 20px;
-    margin: 10px 0 0 0;
-}
-li {
-    padding: 2px 0;
+.match-card.defeat {
+    background-color: #991B1B; /* Dark Red 900 */
+    border-color: #EF4444; /* Red 500 */
 }
 
-.loading {
-    color: #888;
-    font-style: italic;
-    text-align: center;
-    grid-column: 1 / -1; 
-}
-.error {
-    color: #F44336;
-    font-weight: bold;
-    text-align: center;
-    grid-column: 1 / -1;
+.match-card img {
+    width: 64px;
+    height: 64px;
+    border-radius: 0.375rem;
+    margin-right: 1rem;
 }
 
-.mastery-controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
+.match-card .match-info {
+    flex-grow: 1;
 }
 
-#masterySearch {
-    flex-grow: 1; 
-    padding: 8px;
-    min-width: 50px;
+.match-card .match-info p {
+    margin: 0;
 }
 
-#masterySortButton {
-    background-color: #333;
-    color: #fff;
-    border: 1px solid #555;
-    border-radius: 4px;
-    padding: 0 10px;
-    cursor: pointer;
-    white-space: nowrap;
-}
-#masterySortButton:hover {
-    background-color: #444;
+.match-info .win-status {
+    font-size: 1.125rem;
+    font-weight: 700;
 }
 
-#masteryList {
-    max-height: 400px;
-    overflow-y: auto;
-    padding-right: 10px;
+.match-info .game-details {
+    font-size: 0.875rem;
+    color: #D1D5DB; /* Gray 300 */
 }
 
-/* Custom scrollbar for mastery list */
-#masteryList::-webkit-scrollbar {
-    width: 8px;
-}
-#masteryList::-webkit-scrollbar-track {
-    background: #222;
-    border-radius: 4px;
-}
-#masteryList::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 4px;
-}
-#masteryList::-webkit-scrollbar-thumb:hover {
-    background: #555;
+.match-card .kda-info {
+    text-align: right;
 }
 
-.mastery-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 8px;
-    border-radius: 3px;
-    margin-bottom: 2px;
-    transition: transform 0.1s ease;
+.kda-info .kda {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
 }
 
-.mastery-item:hover {
-    transform: translateX(2px);
+.kda-info .kda-ratio {
+    font-size: 0.875rem;
+    color: #D1D5DB; /* Gray 300 */
+    margin: 0;
 }
 
-.mastery-item span:first-child {
-    font-weight: bold;
-}
 
-.mastery-0 {
-    background-color: #4a2d2d;
-    color: #f44336;
-}
-.mastery-1 {
-    background-color: #4a452d;
-    color: #ffc107;
-}
-.mastery-high {
-    background-color: #2f4a2d;
-    color: #4CAF50;
-}
-
-#legendBox {
-    margin-top: -20px; 
-    grid-column: 1 / -1; 
-    text-align: left;
-}
-#legendBox h3 {
-    color: #ffc107;
-    margin-top: 0;
-}
-.legend-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    font-size: 0.9rem;
-    margin-bottom: 10px;
-    line-height: 1.5;
-}
-.legend-color-box {
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-footer {
-    text-align: center;
-    margin-top: 40px;
-    padding-top: 20px;
-    border-top: 1px solid #333;
-    color: #777;
-    font-size: 0.8rem;
-    max-width: 800px;
-    margin-left: auto;
-    margin-right: auto;
-}
-footer a {
-    color: #aaa;
-    text-decoration: none;
-    margin: 0 10px;
-}
-footer a:hover {
-    text-decoration: underline;
-}
-footer p {
-    margin-top: 15px;
-    line-height: 1.5;
-}
-
-/* Mobile responsiveness improvements */
-@media (max-width: 768px) {
-    .result-item {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .result-item strong {
-        min-width: unset;
-        margin-bottom: 4px;
-    }
-    .result-value {
-        text-align: left;
-        justify-content: flex-start;
-    }
-}

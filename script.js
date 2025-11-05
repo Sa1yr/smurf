@@ -87,16 +87,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- NEW: Function to render the stats box ---
+    // --- UPDATED: Function to render the stats box ---
     function renderStatsBox(data, region) {
         const playerLink = buildOpGgLink(data.searchedPlayer.gameName, data.searchedPlayer.tagLine, region);
         
         // --- Create all stat display elements ---
         
-        // *** THIS IS THE RANK FIX ***
-        // We now correctly display the data.currentRank string passed from the API
+        // This correctly displays the "Unranked" or "GOLD IV (20 LP)" string from the API
         const currentRankDisplay = createStatDisplay(data.currentRank, 'neutral');
-        // ***************************
 
         const totalRankDisplay = createStatDisplay(data.totalRank.display, data.highlights.totalWinRate);
         const profileIconDisplay = createStatDisplay(data.profileIcon.isDefault ? "Yes" : "No", data.highlights.profileIcon);

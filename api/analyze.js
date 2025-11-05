@@ -48,11 +48,10 @@ function getRankNumber(tier) {
         "IRON": 0, "BRONZE": 1, "SILVER": 2, "GOLD": 3, "PLATINUM": 4, 
         "EMERALD": 5, "DIAMOND": 6, "MASTER": 7, "GRANDMASTER": 8, "CHALLENGER": 9
     };
-    // tier can be undefined if unranked, default to 0
     return ranks[tier] || 0;
 }
 
-// --- NEW: Heuristic (Rules of Thumb) analysis function ---
+// --- Heuristic (Rules of Thumb) analysis function ---
 function getStatHighlights(stats) {
     const highlights = {
         totalWinRate: 'neutral',
@@ -64,48 +63,34 @@ function getStatHighlights(stats) {
         kp: 'neutral'
     };
 
-    const rankNum = getRankNumber(stats.rankTier); // e.g., "SILVER" -> 2
+    const rankNum = getRankNumber(stats.rankTier); 
 
-    // 1. Total Win Rate (over 50+ games is significant)
-    if (stats.totalGames >= 50 && stats.totalWinRate > 65 && rankNum < 6) { // Below Diamond
+    if (stats.totalGames >= 50 && stats.totalWinRate > 65 && rankNum < 6) { 
         highlights.totalWinRate = 'red';
     }
-
-    // 2. Default Profile Icon
     if (stats.profileIcon <= 28) {
         highlights.profileIcon = 'red';
     }
-
-    // 3. Inconsistent Flash
     if (stats.flashKey === 'D & F') {
         highlights.flash = 'red';
     }
-
-    // 4. Multi-kills
     if (stats.multiKills > 0) {
         highlights.multiKills = 'red';
     }
-
-    // 5. DPM (Damage Per Minute)
-    if (rankNum < 3 && stats.avgDPM > 700) { // Below Gold with 700+ DPM
+    if (rankNum < 3 && stats.avgDPM > 700) { 
         highlights.dpm = 'red';
-    } else if (rankNum < 6 && stats.avgDPM > 900) { // Below Diamond with 900+ DPM
+    } else if (rankNum < 6 && stats.avgDPM > 900) { 
         highlights.dpm = 'red';
     }
-
-    // 6. CSPM (CS Per Minute)
-    if (rankNum < 3 && stats.avgCSPM > 7.5) { // Below Gold with 7.5+ CSPM
+    if (rankNum < 3 && stats.avgCSPM > 7.5) { 
         highlights.cspm = 'red';
-    } else if (rankNum < 6 && stats.avgCSPM > 8.5) { // Below Diamond with 8.5+ CSPM
+    } else if (rankNum < 6 && stats.avgCSPM > 8.5) { 
         highlights.cspm = 'red';
     }
-    
-    // 7. KP (Kill Participation)
-    if (stats.avgKP > 65) { // Consistently high KP
-        highlights.kp = 'green';
-    }
-    if (stats.avgKP > 75) { // Extremely high (smurf-level) KP
+    if (stats.avgKP > 75) { 
         highlights.kp = 'red';
+    } else if (stats.avgKP > 65) { 
+        highlights.kp = 'green';
     }
 
     return highlights;
@@ -127,26 +112,34 @@ export default async function handler(request, response) {
     try {
         // --- STEP 1: Get PUUID ---
         const accountResponse = await fetch(`https://${regionalHost}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${name}/${tag}?api_key=${apiKey}`);
-        if (!accountResponse.ok) throw new Error('Riot ID not found. Check Game Name, Tag, and Region.');
+        if (!accountResponse.ok) throw new Error(`Riot ID not found (Error ${accountResponse.status}). Check Game Name, Tag, and Region.`);
         const accountData = await accountResponse.json();
         const puuid = accountData.puuid;
 
         // --- STEP 2: Get Summoner Data (Level, Icon, ID) ---
         const summonerResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${puuid}?api_key=${apiKey}`);
-        if (!summonerResponse.ok) throw new Error('Summoner data not found on that platform.');
+        if (!summonerResponse.ok) throw new Error(`Summoner data not found (Error ${summonerResponse.status}).`);
         const summonerData = await summonerResponse.json();
         const accountLevel = summonerData.summonerLevel;
         const summonerId = summonerData.id;
-        const profileIconId = summonerData.profileIconId; // <-- NEW
+        const profileIconId = summonerData.profileIconId;
 
-        // --- STEP 3: Get Rank & Total Season Stats (*** CRITICAL FIX ***) ---
+        // --- STEP 3: Get Rank & Total Season Stats (*** CRITICAL DEBUGGING FIX ***) ---
         const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
         
         let currentRank = "Unranked";
         let rankTier = "UNRANKED";
         let totalRankStats = { display: "0W - 0L (0%)", wins: 0, losses: 0, winRate: 0, totalGames: 0 };
         
-        if (rankResponse.ok) {
+        if (!rankResponse.ok) {
+            // THIS IS THE NEW DEBUGGING STEP
+            // If the call fails, we will show the error code instead of "Unranked"
+            currentRank = `API Error: ${rankResponse.status}`;
+            console.error(`Rank API call failed: ${rankResponse.status} ${rankResponse.statusText}`);
+            // We set totalRankStats to a matching error
+            totalRankStats.display = `API Error: ${rankResponse.status}`;
+        } else {
+            // The call was successful (200 OK)
             const rankData = await rankResponse.json();
             const soloDuo = rankData.find(q => q.queueType === "RANKED_SOLO_5x5");
             const flex = rankData.find(q => q.queueType === "RANKED_FLEX_SR");
@@ -163,7 +156,6 @@ export default async function handler(request, response) {
             
             if (flex) {
                 const flexRankNum = getRankNumber(flex.tier);
-                // If flex rank is higher than solo/duo, or if solo/duo is unranked
                 if (flexRankNum > bestRankNum) {
                     bestRank = flex;
                     rankLabel = "(Flex)";
@@ -183,6 +175,7 @@ export default async function handler(request, response) {
                     totalGames: totalGames
                 };
             }
+            // If bestRank is still null, currentRank remains "Unranked"
         }
         // --- END OF RANK FIX ---
 
@@ -212,15 +205,14 @@ export default async function handler(request, response) {
         }
         fullMasteryList.sort((a, b) => b.points - a.points); // Sort by points by default
 
-        // --- STEP 5: Get Match List (20 games) ---
-        // *** CRITICAL FIX ***: Removed queue filter to get ALL recent games
+        // --- STEP 5: Get Match List (20 games, ALL modes) ---
         const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20&api_key=${apiKey}`);
-        if (!matchListResponse.ok) throw new Error('Could not fetch match list.');
+        if (!matchListResponse.ok) throw new Error(`Could not fetch match list (Error ${matchListResponse.status})`);
         const matchIds = await matchListResponse.json();
 
         // --- STEP 6: Analyze Matches ---
         let totalKills = 0, totalDeaths = 0, totalAssists = 0, wins = 0, flashOnD = 0, flashOnF = 0;
-        let totalDPM = 0, totalCSPM = 0, totalKP = 0, totalMultiKills = 0, totalGameTime = 0;
+        let totalDPM = 0, totalCSPM = 0, totalKP = 0, totalMultiKills = 0;
         const duoPartners = {};
         const FLASH_SPELL_ID = 4;
         let validGames = 0; // Count games that aren't remakes/bot games
@@ -230,14 +222,13 @@ export default async function handler(request, response) {
             if (!matchResponse.ok) continue; 
             
             const matchData = await matchResponse.json();
-            // Need to filter out bot games, custom games, etc. which can skew stats
             if (matchData.info.gameDuration < 300) continue; // Skip games less than 5 min
             
             const gameDurationMinutes = matchData.info.gameDuration / 60;
             const playerInfo = matchData.info.participants.find(p => p.puuid === puuid);
             if (!playerInfo) continue;
 
-            validGames++; // This is a valid game to count
+            validGames++; 
             const team = matchData.info.teams.find(t => t.teamId === playerInfo.teamId);
             const teamTotalKills = team ? (team.objectives.champion.kills > 0 ? team.objectives.champion.kills : 1) : 1;
 
@@ -267,9 +258,8 @@ export default async function handler(request, response) {
         }
 
         // --- STEP 7: Calculate Final Stats ---
-        const totalGames = validGames; // Use the count of valid games
+        const totalGames = validGames; 
         if (totalGames === 0) {
-            // Handle account with 0 recent valid games
             const highlights = getStatHighlights({ rankTier, ...totalRankStats, profileIcon: profileIconId });
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
@@ -322,7 +312,7 @@ export default async function handler(request, response) {
             searchedPlayer: { gameName: name, tagLine: tag },
             accountLevel,
             profileIcon: { isDefault: profileIconId <= 28 },
-            currentRank, // This now includes (Solo/Duo) or (Flex)
+            currentRank, // This now includes (Solo/Duo) or (Flex) OR the API error
             totalRank: totalRankStats,
             totalGames,
             wins,
@@ -343,8 +333,7 @@ export default async function handler(request, response) {
         });
 
     } catch (error) {
-        // --- THIS IS THE FIX ---
-        // It was '5T00' and is now '500'
+        // This will catch critical errors like "Riot ID not found"
         response.status(500).json({ error: error.message });
     }
 }

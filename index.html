@@ -3,81 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ranked Stats Viewer</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Inter Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Smurf Detector</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div class="container">
-        <h1>Ranked Stats Viewer</h1>
-
-        <!-- Search Box (UPDATED) -->
-        <div class="search-box">
-            <input type="text" id="gameName" placeholder="Game Name (e.g., Tenmo)">
-            <input type="text" id="tagLine" placeholder="Tag Line (e.g., NA1)">
-            
-            <select id="region">
+    <main>
+        <h1>Smurf Detector (Prototype)</h1>
+        <p>Enter a Riot ID and select a region to analyze their stats.</p>
+        
+        <div class="search-container">
+            <select id="regionSelect">
                 <option value="na1">NA</option>
                 <option value="euw1">EUW</option>
                 <option value="eun1">EUNE</option>
                 <option value="kr">KR</option>
-                <!-- Add other regions as needed -->
+                <option value="br1">BR</option>
+                <option value="jp1">JP</option>
+                <option value="la1">LAN</option>
+                <option value="la2">LAS</option>
+                <option value="oc1">OCE</option>
+                <option value="tr1">TR</option>
+                <option value="ru">RU</option>
             </select>
-            <button id="searchButton">Search</button>
+            <input type="text" id="gameNameInput" placeholder="Game Name">
+            <span class="tag-divider">#</span>
+            <input type="text" id="tagLineInput" placeholder="TAG" maxlength="5">
+            <button id="searchButton">Analyze</button>
         </div>
 
-        <!-- Loading Spinner -->
-        <div id="loading" class="loading-spinner" style="display: none;">
-            <div class="spinner"></div>
-            <p>Fetching ranked data...</p>
-        </div>
-
-        <!-- Error Message -->
-        <div id="error" class="error-message" style="display: none;"></div>
-
-        <!-- Results -->
-        <div id="results" class="results-grid" style="display: none;">
+        <div id="resultsGrid">
+            <div id="statsBox" class="results-box">
+                </div>
             
-            <!-- Column 1: Summoner Info & Rank -->
-            <div class="card" id="profile-card">
-                <div id="summoner-info" class="summoner-info">
-                    <img id="profileIcon" src="https://placehold.co/100x100/1f2937/9ca3af?text=Icon" alt="Profile Icon" class="profile-icon">
-                    <!-- This will now show GameName#TagLine -->
-                    <h2 id="summonerNameDisplay">---</h2>
-                    <p id="summonerLevel">Level ---</p>
+            <div id="masteryBox" class="results-box">
                 </div>
-                
-                <hr class="divider">
-
-                <!-- RANKED STATS WILL GO HERE -->
-                <div id="ranked-stats">
-                    <h3 class="rank-header">Ranked Solo/Duo</h3>
-                    <div id="rank-display" class="rank-display">
-                        <img id="rankIcon" src="https://placehold.co/128x128/1f2937/9ca3af?text=Rank" alt="Rank Icon" class="rank-icon">
-                        <p id="rankTier" class="rank-tier">UNRANKED</p>
-                        <p id="rankLP" class="rank-lp">--- LP</p>
-                        <p id="rankWinLoss" class="rank-winloss">---W / ---L</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Column 2: Match History -->
-            <div class="card" id="match-history-card">
-                <h3 class="card-header">Ranked Match History</h3>
-                <div id="match-history" class="match-history-list">
-                    <p class="text-gray">No ranked games found or data is loading...</p>
-                </div>
-            </div>
-
         </div>
-    </div>
+
+        <div id="legendBox" class="results-box" style="display: none;">
+            </div>
+
+    </main>
+
+    <footer>
+        <a href="/terms.html" target="_blank">Terms of Service</a>
+        <a href="/privacy.html" target="_blank">Privacy Policy</a>
+        <p>"Smurf Detector" isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties.</p>
+    </footer>
 
     <script src="script.js"></script>
 </body>
 </html>
-
-

@@ -111,9 +111,9 @@ function getStatHighlights(stats) {
 }
 
 
-// --- MAIN API FUNCTION ---
+// --- MAIN API FUNCTION (NOW IN COMMONJS SYNTAX) ---
 
-export default async function handler(request, response) {
+module.exports = async (request, response) => {
     const { name, tag, region } = request.query;
     const apiKey = process.env.RIOT_API_KEY;
 
@@ -136,7 +136,7 @@ export default async function handler(request, response) {
         const summonerData = await summonerResponse.json();
         const accountLevel = summonerData.summonerLevel;
         const summonerId = summonerData.id;
-        const profileIconId = summonerData.profileIconId; // <-- NEW
+        const profileIconId = summonerData.profileIconId;
 
         // --- STEP 3: Get Rank & Total Season Stats (*** ADDED LOGGING ***) ---
         const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
@@ -146,16 +146,13 @@ export default async function handler(request, response) {
         let totalRankStats = { display: "0W - 0L (0%)", wins: 0, losses: 0, winRate: 0, totalGames: 0 };
         
         if (!rankResponse.ok) {
-            // This logic is correct: it reports API errors
             currentRank = `API Error: ${rankResponse.status}`;
             console.error(`Rank API call failed: ${rankResponse.status} ${rankResponse.statusText}`);
             totalRankStats.display = `API Error: ${rankResponse.status}`;
         } else {
-            // The call was successful (200 OK)
             const rankData = await rankResponse.json();
             
             // --- NEW DETAILED LOGGING ---
-            // This will show up in your Vercel function logs.
             console.log(`Rank data for summoner ${summonerId}: ${JSON.stringify(rankData)}`);
             // --- END NEW LOGGING ---
 
@@ -174,7 +171,6 @@ export default async function handler(request, response) {
             
             if (flex) {
                 const flexRankNum = getRankNumber(flex.tier);
-                // If flex rank is higher than solo/duo, or if solo/duo is unranked
                 if (flexRankNum > bestRankNum) {
                     bestRank = flex;
                     rankLabel = "(Flex)";
@@ -194,12 +190,8 @@ export default async function handler(request, response) {
                     totalGames: totalGames
                 };
             } else {
-                // --- NEW DETAILED LOGGING ---
-                // This will log if the rankData array was empty or didn't contain ranked queues
                 console.log(`No bestRank found. soloDuo: ${JSON.stringify(soloDuo)}, flex: ${JSON.stringify(flex)}. Setting to Unranked.`);
-                // --- END NEW LOGGING ---
             }
-            // If bestRank is still null, currentRank remains "Unranked"
         }
         // --- END OF STEP 3 ---
 
@@ -239,14 +231,14 @@ export default async function handler(request, response) {
         let totalDPM = 0, totalCSPM = 0, totalKP = 0, totalMultiKills = 0;
         const duoPartners = {};
         const FLASH_SPELL_ID = 4;
-        let validGames = 0; // Count games that aren't remakes/bot games
+        let validGames = 0;
 
         for (const matchId of matchIds) {
             const matchResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/${matchId}?api_key=${apiKey}`);
             if (!matchResponse.ok) continue; 
             
             const matchData = await matchResponse.json();
-            if (matchData.info.gameDuration < 300) continue; // Skip games less than 5 min
+            if (matchData.info.gameDuration < 300) continue; 
             
             const gameDurationMinutes = matchData.info.gameDuration / 60;
             const playerInfo = matchData.info.participants.find(p => p.puuid === puuid);
@@ -288,7 +280,6 @@ export default async function handler(request, response) {
         // --- STEP 7: Calculate Final Stats ---
         const totalGames = validGames; 
         if (totalGames === 0) {
-            // Handle account with 0 recent valid games
             const highlights = getStatHighlights({ rankTier, ...totalRankStats, profileIcon: profileIconId });
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
@@ -341,7 +332,7 @@ export default async function handler(request, response) {
             searchedPlayer: { gameName: name, tagLine: tag },
             accountLevel,
             profileIcon: { isDefault: profileIconId <= 28 },
-            currentRank, // This now includes (Solo/Duo) or (Flex) OR the API error
+            currentRank,
             totalRank: totalRankStats,
             totalGames,
             wins,

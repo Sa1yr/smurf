@@ -138,7 +138,7 @@ export default async function handler(request, response) {
         const summonerId = summonerData.id;
         const profileIconId = summonerData.profileIconId; // <-- NEW
 
-        // --- STEP 3: Get Rank & Total Season Stats (*** CRITICAL FIX ***) ---
+        // --- STEP 3: Get Rank & Total Season Stats (*** ADDED LOGGING ***) ---
         const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
         
         let currentRank = "Unranked";
@@ -146,15 +146,19 @@ export default async function handler(request, response) {
         let totalRankStats = { display: "0W - 0L (0%)", wins: 0, losses: 0, winRate: 0, totalGames: 0 };
         
         if (!rankResponse.ok) {
-            // THIS IS THE NEW DEBUGGING STEP
-            // If the call fails, we will show the error code instead of "Unranked"
+            // This logic is correct: it reports API errors
             currentRank = `API Error: ${rankResponse.status}`;
             console.error(`Rank API call failed: ${rankResponse.status} ${rankResponse.statusText}`);
-            // We set totalRankStats to a matching error
             totalRankStats.display = `API Error: ${rankResponse.status}`;
         } else {
             // The call was successful (200 OK)
             const rankData = await rankResponse.json();
+            
+            // --- NEW DETAILED LOGGING ---
+            // This will show up in your Vercel function logs.
+            console.log(`Rank data for summoner ${summonerId}: ${JSON.stringify(rankData)}`);
+            // --- END NEW LOGGING ---
+
             const soloDuo = rankData.find(q => q.queueType === "RANKED_SOLO_5x5");
             const flex = rankData.find(q => q.queueType === "RANKED_FLEX_SR");
 
@@ -189,10 +193,15 @@ export default async function handler(request, response) {
                     winRate: winRate,
                     totalGames: totalGames
                 };
+            } else {
+                // --- NEW DETAILED LOGGING ---
+                // This will log if the rankData array was empty or didn't contain ranked queues
+                console.log(`No bestRank found. soloDuo: ${JSON.stringify(soloDuo)}, flex: ${JSON.stringify(flex)}. Setting to Unranked.`);
+                // --- END NEW LOGGING ---
             }
             // If bestRank is still null, currentRank remains "Unranked"
         }
-        // --- END OF RANK FIX ---
+        // --- END OF STEP 3 ---
 
 
         // --- STEP 4: Get Champion Mastery (Full List) ---
@@ -221,7 +230,6 @@ export default async function handler(request, response) {
         fullMasteryList.sort((a, b) => b.points - a.points); // Sort by points by default
 
         // --- STEP 5: Get Match List (20 games, ALL modes) ---
-        // *** CRITICAL FIX ***: Removed queue filter to get ALL recent games
         const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20&api_key=${apiKey}`);
         if (!matchListResponse.ok) throw new Error(`Could not fetch match list (Error ${matchListResponse.status})`);
         const matchIds = await matchListResponse.json();
@@ -238,7 +246,6 @@ export default async function handler(request, response) {
             if (!matchResponse.ok) continue; 
             
             const matchData = await matchResponse.json();
-            // Need to filter out bot games, custom games, etc. which can skew stats
             if (matchData.info.gameDuration < 300) continue; // Skip games less than 5 min
             
             const gameDurationMinutes = matchData.info.gameDuration / 60;
@@ -259,12 +266,11 @@ export default async function handler(request, response) {
 
             totalDPM += playerInfo.totalDamageDealtToChampions / gameDurationMinutes;
             totalCSPM += playerInfo.totalMinionsKilled / gameDurationMinutes;
-            // --- KP BUG FIX ---
-            // Ensure KP cannot be over 100%
+
             const playerKP = (playerInfo.kills + playerInfo.assists);
-            const teamKills = teamTotalKills > playerKP ? teamTotalKills : playerKP; // Use the larger of the two
+            const teamKills = teamTotalKills > playerKP ? teamTotalKills : playerKP; 
             totalKP += (teamKills > 0) ? (playerKP / teamKills) * 100 : 0;
-            // ------------------
+
             totalMultiKills += (playerInfo.pentaKills + playerInfo.quadraKills);
 
             matchData.info.participants.forEach(participant => {
@@ -356,8 +362,6 @@ export default async function handler(request, response) {
         });
 
     } catch (error) {
-        // --- THIS IS THE FIX ---
-        // It was '5T00' and is now '500'
         response.status(500).json({ error: error.message });
     }
 }

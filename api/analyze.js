@@ -141,19 +141,8 @@ function getStatHighlights(stats) {
 // --- MAIN API FUNCTION ---
 
 export default async function handler(request, response) {
-    // Set CORS headers to allow requests from your production domain
-    // Replace '*' with 'https://your-domain.com' in production
-    response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    // Handle OPTIONS preflight request
-    if (request.method === 'OPTIONS') {
-        return response.status(200).end();
-    }
-
     const { name, tag, region } = request.query;
-    const apiKey = process.env.RIOT_API_KEY; // This is the secure way
+    const apiKey = process.env.RIOT_API_KEY;
 
     if (!apiKey) return response.status(500).json({ error: "API key is not configured." });
     if (!name || !tag || !region) return response.status(400).json({ error: "Game Name, Tag, and Region are required." });
@@ -174,7 +163,7 @@ export default async function handler(request, response) {
         const summonerData = await summonerResponse.json();
         const accountLevel = summonerData.summonerLevel;
         const summonerId = summonerData.id;
-        const profileIconId = summonerData.profileIconId; // <-- We need this for the frontend
+        const profileIconId = summonerData.profileIconId;
 
         // --- STEP 3: Get Rank Data ---
         const rankResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/league/v4/entries/by-summoner/${summonerId}?api_key=${apiKey}`);
@@ -184,8 +173,9 @@ export default async function handler(request, response) {
         let totalRankStats = { display: "0W - 0L (0%)", wins: 0, losses: 0, winRate: 0, totalGames: 0 };
         
         if (!rankResponse.ok) {
+            currentRank = `API Error: ${rankResponse.status}`;
             console.error(`Rank API Error: ${rankResponse.status} - ${rankResponse.statusText}`);
-            // Don't throw an error, just means they are unranked or API failed
+            totalRankStats.display = `API Error: ${rankResponse.status}`;
         } else {
             const rankData = await rankResponse.json();
             const soloDuo = rankData.find(q => q.queueType === "RANKED_SOLO_5x5");
@@ -224,7 +214,7 @@ export default async function handler(request, response) {
             }
         }
 
-        // --- STEP 4: Get Champion Mastery (Optional for main page, but good for smurf) ---
+        // --- STEP 4: Get Champion Mastery ---
         const allChampsMap = await getChampionMap();
         const masteryResponse = await fetch(`https://${platformHost}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}?api_key=${apiKey}`);
         const playerMasteryMap = new Map();
@@ -249,21 +239,23 @@ export default async function handler(request, response) {
         }
         fullMasteryList.sort((a, b) => b.points - a.points);
 
-        // --- STEP 5: Get Match List (UPDATED: 'type=ranked' & count=5) ---
-        // This is the fix you asked for: only get ranked games. 
-        // We get 5 for the main page display.
-        const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?type=ranked&start=0&count=5&api_key=${apiKey}`);
+        // --- STEP 5: Get Match List (30 games - balanced for personal API key) ---
+        const matchListResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=30&api_key=${apiKey}`);
         if (!matchListResponse.ok) throw new Error(`Could not fetch match list (Error ${matchListResponse.status})`);
         const matchIds = await matchListResponse.json();
 
-        // --- STEP 6: Analyze Matches ---
+        // --- STEP 6: Analyze Matches (SEPARATED by queue type) ---
         let totalKills = 0, totalDeaths = 0, totalAssists = 0, wins = 0, flashOnD = 0, flashOnF = 0;
         let totalDPM = 0, totalCSPM = 0, totalKP = 0, totalMultiKills = 0, totalVisionScore = 0;
+        let rankedKills = 0, rankedDeaths = 0, rankedAssists = 0, rankedWins = 0;
+        let rankedDPM = 0, rankedCSPM = 0, rankedKP = 0, rankedVisionScore = 0;
         const duoPartners = {};
         const uniqueChampions = new Set();
+        const rankedUniqueChampions = new Set();
         const FLASH_SPELL_ID = 4;
+        const RANKED_QUEUE_IDS = [420, 440]; // Solo/Duo (420) and Flex (440)
         let validGames = 0;
-        const matchHistoryForFrontend = []; // <-- NEW: We will send this to the frontend
+        let rankedGames = 0;
 
         for (const matchId of matchIds) {
             const matchResponse = await fetch(`https://${regionalHost}.api.riotgames.com/lol/match/v5/matches/${matchId}?api_key=${apiKey}`);
@@ -275,9 +267,16 @@ export default async function handler(request, response) {
             const gameDurationMinutes = matchData.info.gameDuration / 60;
             const playerInfo = matchData.info.participants.find(p => p.puuid === puuid);
             if (!playerInfo) continue;
+
+            const isRanked = RANKED_QUEUE_IDS.includes(matchData.info.queueId);
             
             validGames++;
             uniqueChampions.add(playerInfo.championName);
+            
+            if (isRanked) {
+                rankedGames++;
+                rankedUniqueChampions.add(playerInfo.championName);
+            }
 
             const team = matchData.info.teams.find(t => t.teamId === playerInfo.teamId);
             const playerKP = (playerInfo.kills + playerInfo.assists);
@@ -290,19 +289,8 @@ export default async function handler(request, response) {
             } else if (playerKP > 0) {
                 participation = 100;
             }
-            
-            // Add to match history list for frontend
-            matchHistoryForFrontend.push({
-                win: playerInfo.win,
-                kills: playerInfo.kills,
-                deaths: playerInfo.deaths,
-                assists: playerInfo.assists,
-                championName: playerInfo.championName,
-                gameDuration: matchData.info.gameDuration,
-                queueType: matchData.info.queueId === 420 ? "Ranked Solo/Duo" : "Ranked Flex"
-            });
 
-            // Stats for smurf detection
+            // Overall stats
             totalKP += participation;
             totalKills += playerInfo.kills;
             totalDeaths += playerInfo.deaths;
@@ -313,38 +301,85 @@ export default async function handler(request, response) {
             totalMultiKills += (playerInfo.pentaKills + playerInfo.quadraKills);
             totalVisionScore += playerInfo.visionScore || 0;
 
+            // Ranked-only stats
+            if (isRanked) {
+                rankedKP += participation;
+                rankedKills += playerInfo.kills;
+                rankedDeaths += playerInfo.deaths;
+                rankedAssists += playerInfo.assists;
+                if (playerInfo.win) rankedWins++;
+                rankedDPM += playerInfo.totalDamageDealtToChampions / gameDurationMinutes;
+                rankedCSPM += playerInfo.totalMinionsKilled / gameDurationMinutes;
+                rankedVisionScore += playerInfo.visionScore || 0;
+            }
+
             if (playerInfo.summoner1Id === FLASH_SPELL_ID) flashOnD++;
             if (playerInfo.summoner2Id === FLASH_SPELL_ID) flashOnF++;
 
-            // Duo detection
-            matchData.info.participants.forEach(participant => {
-                if (participant.puuid !== puuid && participant.teamId === playerInfo.teamId) {
-                    const gameName = participant.riotIdGameName;
-                    const tagLine = participant.riotIdTagline;
-                    if (gameName && gameName !== "undefined") {
-                        const partnerName = `${gameName}#${tagLine}`;
-                        duoPartners[partnerName] = (duoPartners[partnerName] || 0) + 1;
+            // Duo detection (ranked games only for accuracy)
+            if (isRanked) {
+                matchData.info.participants.forEach(participant => {
+                    if (participant.puuid !== puuid && participant.teamId === playerInfo.teamId) {
+                        const gameName = participant.riotIdGameName;
+                        const tagLine = participant.riotIdTagline;
+                        if (gameName && gameName !== "undefined") {
+                            const partnerName = `${gameName}#${tagLine}`;
+                            duoPartners[partnerName] = (duoPartners[partnerName] || 0) + 1;
+                        }
                     }
-                }
-            });
+                });
+            }
         }
 
         // --- STEP 7: Calculate Stats ---
         const totalGames = validGames;
         if (totalGames === 0) {
-            // No recent ranked games found
+            const highlights = getStatHighlights({ 
+                rankTier, 
+                ...totalRankStats, 
+                profileIcon: profileIconId,
+                uniqueChampionsPlayed: 0,
+                rankedGamesCount: 0,
+                rankedWinRate: 0
+            });
             return response.status(200).json({
                 searchedPlayer: { gameName: name, tagLine: tag },
                 accountLevel, 
-                profileIconId,
+                profileIcon: { isDefault: profileIconId <= 28 },
                 currentRank, 
                 totalRank: totalRankStats,
-                matchHistory: [],
-                // ... other stats can be zeroed out
-                highlights: getStatHighlights({ rankTier, ...totalRankStats, profileIcon: profileIconId, rankedGamesCount: 0, rankedWinRate: 0 })
+                totalGames: 0, 
+                wins: 0, 
+                losses: 0, 
+                recentWinRate: 0,
+                rankedGames: 0,
+                rankedWins: 0,
+                rankedLosses: 0,
+                rankedWinRate: 0,
+                avgKills: 0, 
+                avgDeaths: 0, 
+                avgAssists: 0, 
+                avgKDA: 0,
+                avgDPM: 0, 
+                avgCSPM: 0, 
+                avgKP: 0, 
+                avgVisionScore: 0,
+                rankedAvgKDA: 0,
+                rankedAvgDPM: 0,
+                rankedAvgCSPM: 0,
+                rankedAvgKP: 0,
+                rankedAvgVisionScore: 0,
+                multiKills: 0,
+                flashKey: "N/A", 
+                duoList: [], 
+                mastery: fullMasteryList,
+                uniqueChampions: 0,
+                rankedUniqueChampions: 0,
+                highlights
             });
         }
 
+        // Overall stats
         const losses = totalGames - wins;
         const recentWinRate = (wins / totalGames) * 100;
         const avgKDA = (totalKills + totalAssists) / (totalDeaths === 0 ? 1 : totalDeaths);
@@ -353,6 +388,15 @@ export default async function handler(request, response) {
         const avgKP = totalKP / totalGames;
         const avgVisionScore = totalVisionScore / totalGames;
 
+        // Ranked-only stats
+        const rankedLosses = rankedGames - rankedWins;
+        const rankedWinRate = rankedGames > 0 ? (rankedWins / rankedGames) * 100 : 0;
+        const rankedAvgKDA = rankedGames > 0 ? (rankedKills + rankedAssists) / (rankedDeaths === 0 ? 1 : rankedDeaths) : 0;
+        const rankedAvgDPM = rankedGames > 0 ? rankedDPM / rankedGames : 0;
+        const rankedAvgCSPM = rankedGames > 0 ? rankedCSPM / rankedGames : 0;
+        const rankedAvgKP = rankedGames > 0 ? rankedKP / rankedGames : 0;
+        const rankedAvgVisionScore = rankedGames > 0 ? rankedVisionScore / rankedGames : 0;
+
         let flashKey = "None";
         if (flashOnD > 0 && flashOnF > 0) flashKey = "D & F";
         else if (flashOnD > 0) flashKey = "D";
@@ -360,7 +404,7 @@ export default async function handler(request, response) {
 
         const duoList = [];
         for (const partner in duoPartners) {
-            if (duoPartners[partner] >= 2) {
+            if (duoPartners[partner] >= 2) { // Lowered to 2+ games since we're looking at fewer matches
                 duoList.push({ name: partner, games: duoPartners[partner] });
             }
         }
@@ -372,46 +416,58 @@ export default async function handler(request, response) {
             profileIcon: profileIconId,
             flashKey,
             multiKills: totalMultiKills,
-            avgDPM,
-            avgCSPM,
-            avgKP,
-            avgVisionScore,
-            uniqueChampionsPlayed: uniqueChampions.size,
-            rankedGamesCount: totalGames,
-            rankedWinRate: recentWinRate
+            avgDPM: rankedGames > 0 ? rankedAvgDPM : avgDPM,
+            avgCSPM: rankedGames > 0 ? rankedAvgCSPM : avgCSPM,
+            avgKP: rankedGames > 0 ? rankedAvgKP : avgKP,
+            avgVisionScore: rankedGames > 0 ? rankedAvgVisionScore : avgVisionScore,
+            uniqueChampionsPlayed: rankedUniqueChampions.size,
+            rankedGamesCount: rankedGames,
+            rankedWinRate: rankedWinRate
         });
 
         // --- STEP 8: Return Data ---
         response.status(200).json({
             searchedPlayer: { gameName: name, tagLine: tag },
             accountLevel,
-            profileIconId, // <-- ADDED for frontend
+            profileIcon: { isDefault: profileIconId <= 28 },
             currentRank, 
             totalRank: totalRankStats,
             
-            // These are all RANKED-ONLY stats now
-            rankedGames: totalGames,
-            rankedWins: wins,
-            rankedLosses: losses,
-            rankedWinRate: recentWinRate,
-            rankedAvgKDA: avgKDA,
-            rankedAvgDPM: avgDPM,
-            rankedAvgCSPM: avgCSPM,
-            rankedAvgKP: avgKP,
-            rankedAvgVisionScore: avgVisionScore,
+            // Overall recent stats (all game modes)
+            totalGames,
+            wins,
+            losses,
+            recentWinRate,
+            avgKills: totalKills / totalGames,
+            avgDeaths: totalDeaths / totalGames,
+            avgAssists: totalAssists / totalGames,
+            avgKDA,
+            avgDPM,
+            avgCSPM,
+            avgKP,
+            avgVisionScore,
+            
+            // Ranked-only stats
+            rankedGames,
+            rankedWins,
+            rankedLosses,
+            rankedWinRate,
+            rankedAvgKDA,
+            rankedAvgDPM,
+            rankedAvgCSPM,
+            rankedAvgKP,
+            rankedAvgVisionScore,
             
             multiKills: totalMultiKills,
             flashKey,
             duoList,
             mastery: fullMasteryList,
-            rankedUniqueChampions: uniqueChampions.size,
-            highlights,
-            matchHistory: matchHistoryForFrontend // <-- ADDED for frontend
+            uniqueChampions: uniqueChampions.size,
+            rankedUniqueChampions: rankedUniqueChampions.size,
+            highlights
         });
 
     } catch (error) {
-        console.error("Error in /api/analyze:", error);
         response.status(500).json({ error: error.message });
     }
 }
-
